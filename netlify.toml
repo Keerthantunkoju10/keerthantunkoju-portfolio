@@ -1,0 +1,27 @@
+# Netlify Configuration for Keerthan Tunkoju Portfolio
+
+[build]
+  publish = "."
+
+# Security and caching headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# PDF Resume headers - optimize inline viewing & downloading
+[[headers]]
+  for = "/Keerthan_Tunkoju_Resume.pdf"
+  [headers.values]
+    Content-Type = "application/pdf"
+    Content-Disposition = "inline; filename=\"Keerthan_Tunkoju_Resume.pdf\""
+    Cache-Control = "public, max-age=86400"
+
+# Asset caching
+[[headers]]
+  for = "/Assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"

@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Personal Portfolio of Keerthan Tunkoju - Entry-Level Software Developer, AI & ML Graduate, and GIS Engineer.">
+  <meta name="author" content="Keerthan Tunkoju">
+  <meta name="theme-color" content="#0b0f19">
+  <title>Keerthan Tunkoju | Software Developer &amp; AI/ML Graduate</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Accessible Skip Link -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- Admin Floating Toolbar (Visible only when logged in as admin) -->
+  <div id="admin-toolbar" class="admin-toolbar" hidden>
+    <div class="container admin-toolbar-inner">
+      <div class="admin-toolbar-left">
+        <span class="admin-badge">
+          <span class="admin-indicator"></span> Admin Active
+        </span>
+        <!-- Edit Mode Switch -->
+        <label class="edit-mode-toggle" title="Toggle live inline visual editing on page">
+          <input type="checkbox" id="edit-mode-checkbox">
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">Live Inline Edit: <strong id="edit-mode-status">OFF</strong></span>
+        </label>
+      </div>
+
+      <div class="admin-toolbar-actions">
+        <button id="open-cms-btn" class="btn btn-sm btn-secondary" title="Open visual CMS dashboard">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>CMS Dashboard</span>
+        </button>
+
+        <button id="save-data-btn" class="btn btn-sm btn-primary" title="Save changes to local browser storage">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+          <span>Save Changes</span>
+        </button>
+
+        <button id="export-json-btn" class="btn btn-sm btn-outline" title="Export portfolio data to a JSON backup file">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Export JSON</span>
+        </button>
+
+        <button id="admin-logout-btn" class="btn btn-sm btn-danger" title="Logout from admin session">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header / Navigation Bar -->
+  <header class="site-header" id="header">
+    <nav class="navbar container" aria-label="Main Navigation">
+      <a href="#hero" class="nav-logo" aria-label="Keerthan Tunkoju Home">
+        <span class="logo-bracket">&lt;</span><span id="nav-brand-name">Keerthan</span><span class="logo-accent">.dev</span><span class="logo-bracket">/&gt;</span>
+      </a>
+
+      <!-- Desktop & Mobile Navigation Links -->
+      <div class="nav-menu" id="nav-menu">
+        <ul class="nav-list">
+          <li class="nav-item"><a href="#about" class="nav-link">About</a></li>
+          <li class="nav-item"><a href="#experience" class="nav-link">Experience</a></li>
+          <li class="nav-item"><a href="#skills" class="nav-link">Skills</a></li>
+          <li class="nav-item"><a href="#projects" class="nav-link">Projects</a></li>
+          <li class="nav-item"><a href="#education" class="nav-link">Education</a></li>
+          <li class="nav-item"><a href="#contact" class="nav-link">Contact</a></li>
+        </ul>
+        <div class="nav-cta-mobile">
+          <a href="#contact" class="btn btn-primary btn-sm">Get In Touch</a>
+        </div>
+      </div>
+
+      <!-- Header Action Controls -->
+      <div class="nav-actions">
+        <!-- Admin Access Button -->
+        <button id="admin-trigger-btn" class="admin-trigger-btn" aria-label="Admin Login (Ctrl+Shift+A)" title="Admin Login (Ctrl+Shift+A)">
+          <svg class="lock-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span class="admin-btn-text">Admin</span>
+        </button>
+
+        <!-- Theme Toggle Button -->
+        <button id="theme-toggle" class="theme-toggle-btn" aria-label="Toggle light and dark theme" title="Toggle theme">
+          <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+
+        <a href="#contact" class="btn btn-primary btn-sm desktop-only">Get In Touch</a>
+
+        <!-- Mobile Hamburger Toggle -->
+        <button id="menu-toggle" class="menu-toggle-btn" aria-expanded="false" aria-controls="nav-menu" aria-label="Toggle navigation menu">
+          <span class="hamburger-bar"></span>
+          <span class="hamburger-bar"></span>
+          <span class="hamburger-bar"></span>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main Content Wrapper -->
+  <main id="main-content">
+
+    <!-- Hero Section -->
+    <section id="hero" class="hero-section" aria-label="Introduction">
+      <div class="container hero-container">
+        <div class="hero-content">
+          <div class="hero-badge" data-editable="profile.statusText">
+            <span class="status-indicator"></span> Available for Software Developer &amp; AI/ML Roles
+          </div>
+
+          <h1 class="hero-title">
+            <span data-editable="profile.headlineStart">Hi, I'm </span><span class="gradient-text" data-editable="profile.headlineAccent">Keerthan Tunkoju</span><span data-editable="profile.headlineEnd">.</span>
+          </h1>
+
+          <p class="hero-description" data-editable="profile.heroDescription">
+            Computer Science graduate specializing in Artificial Intelligence &amp; Machine Learning and practicing GIS Engineer at NeoGeoInfo Technologies. Experienced in deep learning computer vision, predictive ML pipelines, spatial data engineering, and modern web applications.
+          </p>
+
+          <div class="hero-cta-group">
+            <a href="#projects" class="btn btn-primary">
+              <span>View Projects</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </a>
+            <a href="#experience" class="btn btn-secondary">
+              <span>Experience</span>
+            </a>
+            <a href="#contact" class="btn btn-secondary">
+              <span>Contact Me</span>
+            </a>
+            <a href="Keerthan_Tunkoju_Resume.pdf" target="_blank" rel="noopener noreferrer" class="btn btn-outline" id="cv-btn" title="View & Download Keerthan's Resume PDF">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              <span>View Resume</span>
+            </a>
+          </div>
+
+          <!-- Hero Social Links & Contact Details -->
+          <div class="hero-socials">
+            <span class="social-label">Find Me:</span>
+            <div class="social-links" id="hero-socials-container">
+              <!-- Rendered Dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero Visual / Code Card Element -->
+        <div class="hero-visual" aria-hidden="true">
+          <div class="code-window-card">
+            <div class="window-header">
+              <span class="window-dot dot-red"></span>
+              <span class="window-dot dot-yellow"></span>
+              <span class="window-dot dot-green"></span>
+              <span class="window-title">keerthan_profile.py</span>
+            </div>
+            <pre class="window-body"><code id="code-card-body"><span class="code-keyword">class</span> <span class="code-var">Developer</span>:
+    name = <span class="code-string">"Keerthan Tunkoju"</span>
+    degree = <span class="code-string">"B.Tech CSE (AI &amp; ML)"</span>
+    current_role = <span class="code-string">"GIS Engineer @ NeoGeoInfo"</span>
+    core_languages = [<span class="code-string">"Python"</span>, <span class="code-string">"HTML"</span>, <span class="code-string">"JavaScript"</span>, <span class="code-string">"SQL"</span>]
+    focus_areas = [
+        <span class="code-string">"Deep Learning &amp; CNNs"</span>,
+        <span class="code-string">"Spatial Digitization &amp; GIS"</span>,
+        <span class="code-string">"Responsive Web Systems"</span>
+    ]
+    location = <span class="code-string">"Hyderabad, India"</span>
+
+    <span class="code-function">def ready_to_contribute</span>(self):
+        <span class="code-keyword">return</span> <span class="code-string">"Solving real-world problems with code &amp; data"</span></code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- About Me Section -->
+    <section id="about" class="section about-section" aria-labelledby="about-heading">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-subtitle">Profile &amp; Background</span>
+          <h2 id="about-heading" class="section-title">About Me</h2>
+          <div class="title-underline"></div>
+        </header>
+
+        <div class="about-grid">
+          <div class="about-image-card">
+            <div class="avatar-container">
+              <div class="avatar-graphic" id="profile-avatar-graphic">
+                <img id="profile-avatar-img" class="avatar-img" src="Assets/keerthan-photo.jpg" alt="Keerthan Tunkoju" onerror="this.style.display='none';document.getElementById('profile-avatar-svg').style.display='block';">
+                <svg id="profile-avatar-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" aria-label="Keerthan Tunkoju avatar" style="display:none;">
+                  <defs>
+                    <linearGradient id="avatarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#3b82f6"/>
+                      <stop offset="100%" stop-color="#8b5cf6"/>
+                    </linearGradient>
+                  </defs>
+                  <circle cx="100" cy="100" r="90" fill="url(#avatarGrad)" opacity="0.15" />
+                  <circle cx="100" cy="75" r="35" fill="url(#avatarGrad)" />
+                  <path d="M40 165 C 40 120, 160 120, 160 165 Z" fill="url(#avatarGrad)" />
+                </svg>
+              </div>
+              <div class="experience-badge">
+                <span class="badge-num" data-editable="education.0.badge">B.Tech</span>
+                <span class="badge-label">AI &amp; ML (2020-2024)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="about-text">
+            <h3 class="about-lead" data-editable="profile.aboutLead">
+              AI/ML-focused Computer Science graduate &amp; practicing GIS Engineer with a passion for software engineering.
+            </h3>
+            <p data-editable="profile.aboutP1">
+              I graduated with a B.Tech in Computer Science &amp; Engineering (Artificial Intelligence &amp; Machine Learning) from Sri Indu Institute of Engineering &amp; Technology. My academic journey provided rigorous training in Machine Learning, Deep Learning, Data Structures &amp; Algorithms, and Database Management Systems.
+            </p>
+            <p data-editable="profile.aboutP2">
+              Currently, I work as a GIS Engineer at NeoGeoInfo Technologies Ltd., where I deliver production-ready urban GIS databases for the Greater Hyderabad Municipal Corporation (GHMC). I specialize in spatial data digitization, topology validation, and attribute QA/QC across roads, electric networks, drainage, water bodies, and civic infrastructure using ArcGIS, QGIS, Google Earth, and Global Mapper.
+            </p>
+            <p data-editable="profile.aboutP3">
+              In addition to spatial engineering, I have delivered end-to-end Machine Learning solutions—including deep learning CNNs for brain tumor medical imaging and supervised agricultural crop yield prediction models—and built responsive web applications during industry internships with Bharat Intern, CodSoft, and Intrainz.
+            </p>
+
+            <!-- Key Resume Metrics Container -->
+            <div class="about-stats-grid" id="stats-container">
+              <!-- Rendered Dynamically -->
+            </div>
+
+            <div class="about-cta">
+              <a href="#contact" class="btn btn-primary">Let's Connect</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Professional Experience Section -->
+    <section id="experience" class="section experience-section" aria-labelledby="experience-heading">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-subtitle">Career Journey</span>
+          <h2 id="experience-heading" class="section-title">Work &amp; Internship Experience</h2>
+          <div class="title-underline"></div>
+          <p class="section-intro">Practical industry experience spanning spatial engineering, software scripting, and web development.</p>
+        </header>
+
+        <!-- Admin Experience Quick Add Button -->
+        <div class="admin-section-actions" data-admin-only hidden>
+          <button id="add-experience-btn" class="btn btn-sm btn-primary">
+            <span>+ Add New Experience</span>
+          </button>
+        </div>
+
+        <div class="timeline-container" id="timeline-container">
+          <!-- Rendered Dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Technical Skills Section -->
+    <section id="skills" class="section skills-section" aria-labelledby="skills-heading">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-subtitle">Technical Toolkit</span>
+          <h2 id="skills-heading" class="section-title">Technical Skills</h2>
+          <div class="title-underline"></div>
+          <p class="section-intro">Technologies, tools, and methodologies leveraged across software, AI, and spatial engineering projects.</p>
+        </header>
+
+        <div class="skills-categories-grid" id="skills-container">
+          <!-- Rendered Dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects" class="section projects-section" aria-labelledby="projects-heading">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-subtitle">Portfolio Showcase</span>
+          <h2 id="projects-heading" class="section-title">Academic &amp; Engineering Projects</h2>
+          <div class="title-underline"></div>
+          <p class="section-intro">Demonstrating practical applications of Deep Learning, Machine Learning, GIS Spatial Engineering, and Full-Stack Web Development.</p>
+        </header>
+
+        <!-- Admin Projects Quick Add Button -->
+        <div class="admin-section-actions" data-admin-only hidden>
+          <button id="add-project-btn" class="btn btn-sm btn-primary">
+            <span>+ Add New Project</span>
+          </button>
+        </div>
+
+        <div class="projects-grid" id="projects-container">
+          <!-- Rendered Dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Education & Certifications Section -->
+    <section id="education" class="section education-section" aria-labelledby="education-heading">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-subtitle">Academic Credentials</span>
+          <h2 id="education-heading" class="section-title">Education &amp; Certifications</h2>
+          <div class="title-underline"></div>
+        </header>
+
+        <div class="education-grid" id="education-container">
+          <!-- Rendered Dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="section contact-section" aria-labelledby="contact-heading">
+      <div class="container">
+        <header class="section-header">
+          <span class="section-subtitle">Get In Touch</span>
+          <h2 id="contact-heading" class="section-title">Contact Keerthan</h2>
+          <div class="title-underline"></div>
+          <p class="section-intro">Looking for an enthusiastic entry-level Software Developer or AI/ML Engineer? Let's discuss how I can contribute to your team.</p>
+        </header>
+
+        <div class="contact-grid">
+          <!-- Contact Info Column -->
+          <div class="contact-info">
+            <h3 class="contact-info-title">Let's talk about opportunities</h3>
+            <p class="contact-info-text">
+              I am open to full-time Software Developer, AI/ML, Python Engineer, and GIS roles. Feel free to connect directly via email, phone, or LinkedIn.
+            </p>
+
+            <address class="contact-methods" id="contact-methods-container">
+              <!-- Rendered Dynamically -->
+            </address>
+          </div>
+
+          <!-- Interactive Contact Form -->
+          <div class="contact-form-card">
+            <form id="contact-form" class="contact-form" novalidate>
+              <div id="form-alert" class="form-alert" role="alert" aria-live="polite" hidden></div>
+
+              <div class="form-group">
+                <label for="contact-name" class="form-label">Full Name <span class="required">*</span></label>
+                <input 
+                  type="text" 
+                  id="contact-name" 
+                  name="name" 
+                  class="form-input" 
+                  placeholder="e.g. Hiring Manager / Recruiter" 
+                  required
+                  minlength="2"
+                  autocomplete="name"
+                >
+                <span class="form-error" id="name-error" aria-live="polite"></span>
+              </div>
+
+              <div class="form-group">
+                <label for="contact-email" class="form-label">Email Address <span class="required">*</span></label>
+                <input 
+                  type="email" 
+                  id="contact-email" 
+                  name="email" 
+                  class="form-input" 
+                  placeholder="e.g. recruiter@company.com" 
+                  required
+                  autocomplete="email"
+                >
+                <span class="form-error" id="email-error" aria-live="polite"></span>
+              </div>
+
+              <div class="form-group">
+                <label for="contact-subject" class="form-label">Subject</label>
+                <input 
+                  type="text" 
+                  id="contact-subject" 
+                  name="subject" 
+                  class="form-input" 
+                  placeholder="Job Opportunity, Interview Invitation, Collaboration"
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="contact-message" class="form-label">Your Message <span class="required">*</span></label>
+                <textarea 
+                  id="contact-message" 
+                  name="message" 
+                  class="form-input form-textarea" 
+                  rows="5" 
+                  placeholder="Describe the opportunity or message..." 
+                  required
+                  minlength="10"
+                ></textarea>
+                <span class="form-error" id="message-error" aria-live="polite"></span>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-block" id="submit-btn">
+                <span class="btn-text">Send Message</span>
+                <svg class="btn-spinner" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" hidden>
+                  <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                </svg>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-brand">
+        <a href="#hero" class="footer-logo">
+          <span class="logo-bracket">&lt;</span><span id="footer-brand-name">Keerthan Tunkoju</span><span class="logo-accent">.dev</span><span class="logo-bracket">/&gt;</span>
+        </a>
+        <p class="footer-tagline" id="footer-tagline">Entry-Level Software Developer &bull; AI &amp; ML Graduate &bull; GIS Engineer</p>
+      </div>
+
+      <div class="footer-bottom">
+        <p class="copyright-text">
+          &copy; <span id="current-year">2026</span> <span id="footer-copy-name">Keerthan Tunkoju</span>. All rights reserved.
+        </p>
+        <a href="#hero" class="back-to-top" aria-label="Scroll back to top of page">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="18 15 12 9 6 15"></polyline>
+          </svg>
+          <span>Back to Top</span>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==========================================================================
+       ADMIN AUTHENTICATION & CMS MODALS
+       ========================================================================== -->
+
+  <!-- 1. Admin Login Modal -->
+  <div id="admin-login-modal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg class="modal-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <h3 class="modal-title">Admin Authentication</h3>
+        </div>
+        <button class="modal-close-btn" data-close-modal title="Close modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Enter the administrative password to unlock live inline website editing and content management.</p>
+        
+        <form id="admin-login-form">
+          <div class="form-group">
+            <label for="admin-password" class="form-label">Admin Password</label>
+            <div class="password-input-wrap">
+              <input type="password" id="admin-password" class="form-input" placeholder="Enter admin password" required autocomplete="current-password">
+              <button type="button" id="toggle-password-visibility" class="password-toggle-btn" title="Show/hide password" aria-label="Show or hide password">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+            <div id="login-error-msg" class="form-error" aria-live="polite"></div>
+          </div>
+
+          <div class="login-tip">
+            <span>💡 <strong>Default Password:</strong> <code>admin123</code> (You can change this in the Admin Panel anytime)</span>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" data-close-modal>Cancel</button>
+            <button type="submit" class="btn btn-primary" id="admin-login-submit">Login as Admin</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Admin CMS Dashboard Modal -->
+  <div id="admin-cms-modal" class="modal-backdrop modal-lg" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg class="modal-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <h3 class="modal-title">Portfolio CMS &amp; Content Management</h3>
+        </div>
+        <button class="modal-close-btn" data-close-modal title="Close">&times;</button>
+      </div>
+
+      <!-- CMS Tabs Navigation -->
+      <div class="cms-tabs">
+        <button class="cms-tab-btn active" data-tab="tab-profile">Profile &amp; Bio</button>
+        <button class="cms-tab-btn" data-tab="tab-experience">Experience</button>
+        <button class="cms-tab-btn" data-tab="tab-projects">Projects</button>
+        <button class="cms-tab-btn" data-tab="tab-skills">Skills</button>
+        <button class="cms-tab-btn" data-tab="tab-messages">📬 Inbox (<span id="msg-badge-count">0</span>)</button>
+        <button class="cms-tab-btn" data-tab="tab-database">🗄️ Database</button>
+        <button class="cms-tab-btn" data-tab="tab-backup">Data &amp; Backup</button>
+        <button class="cms-tab-btn" data-tab="tab-security">Security</button>
+      </div>
+
+      <div class="modal-body cms-tab-content-container">
+
+        <!-- Tab 1: Profile & Bio -->
+        <div id="tab-profile" class="cms-tab-pane active">
+          <form id="cms-profile-form">
+            <!-- Profile Photo Upload Card -->
+            <div class="cms-photo-upload-card">
+              <div class="cms-photo-header">
+                <div class="cms-photo-preview-wrap">
+                  <div class="cms-photo-preview" id="cms-photo-preview" title="Click or Drag & Drop a photo here">
+                    <img id="cms-avatar-preview-img" src="" alt="Profile Preview" class="cms-avatar-img" style="display:none;">
+                    <div id="cms-avatar-preview-placeholder" class="cms-avatar-placeholder">
+                      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="cms-preview-svg">
+                        <circle cx="100" cy="75" r="35" fill="currentColor" opacity="0.6"/>
+                        <path d="M40 165 C 40 120, 160 120, 160 165 Z" fill="currentColor" opacity="0.6"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <span class="cms-photo-badge" id="cms-photo-status-badge">Default Avatar</span>
+                </div>
+
+                <div class="cms-photo-controls">
+                  <h4 class="cms-photo-title">Profile Photo / Avatar</h4>
+                  <p class="cms-photo-hint">Upload a portrait photo to personalize your portfolio. Supports JPG, PNG, and WebP (auto-resized for fast loading).</p>
+                  
+                  <div class="cms-photo-btn-group">
+                    <input type="file" id="cms-photo-file-input" accept="image/png, image/jpeg, image/jpg, image/webp" style="display:none;">
+                    <button type="button" class="btn btn-primary btn-sm" id="cms-photo-upload-btn">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                      <span>Upload Photo</span>
+                    </button>
+                    <button type="button" class="btn btn-outline btn-sm" id="cms-photo-remove-btn" title="Revert to default graphic silhouette">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                      <span>Remove</span>
+                    </button>
+                  </div>
+
+                  <div class="cms-photo-url-wrap">
+                    <div class="cms-photo-url-flex">
+                      <input type="text" id="cms-photo-url-input" class="form-input" placeholder="Or enter image URL or path (e.g. Assets/keerthan-photo.jpg)">
+                      <button type="button" id="cms-photo-url-apply-btn" class="btn btn-secondary btn-sm">Apply</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cms-name" class="form-label">Full Name</label>
+                <input type="text" id="cms-name" class="form-input" required>
+              </div>
+              <div class="form-group">
+                <label for="cms-status" class="form-label">Status Banner</label>
+                <input type="text" id="cms-status" class="form-input">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="cms-hero-desc" class="form-label">Hero Introduction</label>
+              <textarea id="cms-hero-desc" class="form-input form-textarea" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="cms-about-lead" class="form-label">About Section Headline</label>
+              <input type="text" id="cms-about-lead" class="form-input">
+            </div>
+
+            <div class="form-group">
+              <label for="cms-about-p1" class="form-label">About Paragraph 1 (Education / Background)</label>
+              <textarea id="cms-about-p1" class="form-input form-textarea" rows="2"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="cms-about-p2" class="form-label">About Paragraph 2 (Current Role / Experience)</label>
+              <textarea id="cms-about-p2" class="form-input form-textarea" rows="2"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="cms-about-p3" class="form-label">About Paragraph 3 (Projects &amp; Focus)</label>
+              <textarea id="cms-about-p3" class="form-input form-textarea" rows="2"></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cms-email" class="form-label">Email</label>
+                <input type="email" id="cms-email" class="form-input">
+              </div>
+              <div class="form-group">
+                <label for="cms-phone" class="form-label">Phone</label>
+                <input type="text" id="cms-phone" class="form-input">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cms-location" class="form-label">Location</label>
+                <input type="text" id="cms-location" class="form-input">
+              </div>
+              <div class="form-group">
+                <label for="cms-linkedin" class="form-label">LinkedIn URL</label>
+                <input type="url" id="cms-linkedin" class="form-input">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="cms-github" class="form-label">GitHub URL</label>
+              <input type="url" id="cms-github" class="form-input">
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Profile Details</button>
+          </form>
+        </div>
+
+        <!-- Tab 2: Experience Manager -->
+        <div id="tab-experience" class="cms-tab-pane">
+          <div class="cms-pane-header">
+            <p class="cms-pane-desc">Manage career roles and internship milestones.</p>
+            <button class="btn btn-sm btn-primary" id="cms-add-exp-btn">+ Add Role</button>
+          </div>
+          <div class="cms-item-list" id="cms-exp-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Tab 3: Projects Manager -->
+        <div id="tab-projects" class="cms-tab-pane">
+          <div class="cms-pane-header">
+            <p class="cms-pane-desc">Add, edit, or delete showcased engineering &amp; software projects.</p>
+            <button class="btn btn-sm btn-primary" id="cms-add-proj-btn">+ Add Project</button>
+          </div>
+          <div class="cms-item-list" id="cms-proj-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Tab 4: Skills Manager -->
+        <div id="tab-skills" class="cms-tab-pane">
+          <div class="cms-pane-header">
+            <p class="cms-pane-desc">Add or remove skills across core categories.</p>
+          </div>
+          <div id="cms-skills-editor">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Tab 5: Data Backup & Reset -->
+        <div id="tab-backup" class="cms-tab-pane">
+          <div class="backup-section">
+            <h4 class="backup-title">Export / Download Data</h4>
+            <p class="backup-desc">Download a complete <code>portfolio-data.json</code> file containing all your current customizations.</p>
+            <div class="backup-actions">
+              <button id="cms-export-btn" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Download portfolio-data.json</span>
+              </button>
+              <button id="cms-copy-json-btn" class="btn btn-secondary">Copy JSON to Clipboard</button>
+            </div>
+          </div>
+
+          <hr class="backup-divider">
+
+          <div class="backup-section">
+            <h4 class="backup-title">Import Data Backup</h4>
+            <p class="backup-desc">Upload a previously saved <code>portfolio-data.json</code> file to restore your customized content.</p>
+            <input type="file" id="cms-import-file-input" accept=".json" class="file-input">
+          </div>
+
+          <hr class="backup-divider">
+
+          <div class="backup-section danger-zone">
+            <h4 class="backup-title text-danger">Reset to Resume Defaults</h4>
+            <p class="backup-desc">Restore all website text, projects, and experiences back to Keerthan Tunkoju's original verified resume data.</p>
+            <button id="cms-reset-btn" class="btn btn-danger">Reset All Data to Default</button>
+          </div>
+        </div>
+
+        <!-- Tab 6: Security (Change Password) -->
+        <div id="tab-security" class="cms-tab-pane">
+          <form id="change-password-form">
+            <p class="cms-pane-desc">Update your admin login password. The password is cryptographically hashed using SHA-256 in your browser.</p>
+
+            <div class="form-group">
+              <label for="current-pass" class="form-label">Current Admin Password</label>
+              <input type="password" id="current-pass" class="form-input" required autocomplete="current-password">
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="new-pass" class="form-label">New Password (min 6 characters)</label>
+                <input type="password" id="new-pass" class="form-input" minlength="6" required autocomplete="new-password">
+              </div>
+              <div class="form-group">
+                <label for="confirm-pass" class="form-label">Confirm New Password</label>
+                <input type="password" id="confirm-pass" class="form-input" minlength="6" required autocomplete="new-password">
+              </div>
+            </div>
+
+            <div id="password-feedback" class="form-alert" hidden></div>
+
+            <button type="submit" class="btn btn-primary">Update Admin Password</button>
+          </form>
+        </div>
+
+        <!-- Tab 7: Contact Messages Inbox (Stored in Database) -->
+        <div id="tab-messages" class="cms-tab-pane">
+          <div class="cms-pane-header">
+            <div>
+              <h4 class="backup-title">Contact Inquiries Database</h4>
+              <p class="cms-pane-desc">Messages submitted by recruiters &amp; visitors via the contact form, stored in SQLite database.</p>
+            </div>
+            <button class="btn btn-sm btn-secondary" id="refresh-messages-btn">🔄 Refresh Inbox</button>
+          </div>
+          <div id="messages-list-container" class="messages-list-wrap">
+            <!-- Dynamically populated from database -->
+          </div>
+        </div>
+
+        <!-- Tab 8: Database Status & Diagnostics -->
+        <div id="tab-database" class="cms-tab-pane">
+          <div class="backup-section">
+            <h4 class="backup-title">🗄️ SQLite Database Diagnostics</h4>
+            <p class="backup-desc">Live status of the SQLite database (<code>portfolio.db</code>) running on the local or hosted server.</p>
+            
+            <div class="db-stats-grid">
+              <div class="stat-card">
+                <span class="stat-number" id="db-stat-engine">SQLite 3</span>
+                <span class="stat-label">Database Engine</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-number" id="db-stat-msgs">0</span>
+                <span class="stat-label">Stored Inquiries</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-number" id="db-stat-size">0 KB</span>
+                <span class="stat-label">Database File Size</span>
+              </div>
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+              <p class="backup-desc">Database File: <code>portfolio.db</code> (Persistent relational database with transactions)</p>
+              <button id="db-resync-btn" class="btn btn-primary" style="margin-top: 0.75rem;">
+                <span>🔄 Sync with SQLite Database</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Edit / Add Experience Modal -->
+  <div id="exp-edit-modal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="exp-modal-title">Edit Work Experience</h3>
+        <button class="modal-close-btn" data-close-modal title="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="exp-edit-form">
+          <input type="hidden" id="exp-id">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="exp-role" class="form-label">Job Title / Role</label>
+              <input type="text" id="exp-role" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label for="exp-company" class="form-label">Company / Organization</label>
+              <input type="text" id="exp-company" class="form-input" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="exp-period" class="form-label">Time Period (e.g., Feb 2026 – Present)</label>
+            <input type="text" id="exp-period" class="form-input" required>
+          </div>
+
+          <div class="form-group">
+            <label for="exp-bullets" class="form-label">Achievements / Responsibilities (One per line)</label>
+            <textarea id="exp-bullets" class="form-input form-textarea" rows="5" placeholder="Bullet 1&#10;Bullet 2&#10;Bullet 3" required></textarea>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" data-close-modal>Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Experience</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Edit / Add Project Modal -->
+  <div id="proj-edit-modal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" id="proj-modal-title">Edit Project</h3>
+        <button class="modal-close-btn" data-close-modal title="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="proj-edit-form">
+          <input type="hidden" id="proj-id">
+          <div class="form-group">
+            <label for="proj-title" class="form-label">Project Title</label>
+            <input type="text" id="proj-title" class="form-input" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="proj-category" class="form-label">Category Badge (e.g. AI / Healthcare)</label>
+              <input type="text" id="proj-category" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label for="proj-theme" class="form-label">Color Theme</label>
+              <select id="proj-theme" class="form-input">
+                <option value="preview-gradient-1">Blue &bull; Violet</option>
+                <option value="preview-gradient-2">Emerald &bull; Blue</option>
+                <option value="preview-gradient-3">Fuchsia &bull; Indigo</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="proj-tags" class="form-label">Technologies / Tags (Comma-separated)</label>
+            <input type="text" id="proj-tags" class="form-input" placeholder="Python, CNN, Deep Learning" required>
+          </div>
+
+          <div class="form-group">
+            <label for="proj-desc" class="form-label">Project Description</label>
+            <textarea id="proj-desc" class="form-input form-textarea" rows="4" required></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="proj-github" class="form-label">GitHub Repository URL</label>
+              <input type="url" id="proj-github" class="form-input" placeholder="https://github.com/...">
+            </div>
+            <div class="form-group">
+              <label for="proj-live" class="form-label">Live Demo URL</label>
+              <input type="text" id="proj-live" class="form-input" placeholder="https://... or #experience">
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" data-close-modal>Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Project</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Interactive Resume Preview Modal -->
+  <div id="resume-modal" class="modal-backdrop modal-lg" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg class="modal-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          <h3 class="modal-title">Keerthan Tunkoju &bull; Resume Preview</h3>
+        </div>
+        <button class="modal-close-btn" data-close-modal title="Close">&times;</button>
+      </div>
+
+      <div class="resume-modal-toolbar">
+        <a href="Keerthan_Tunkoju_Resume.pdf" download="Keerthan_Tunkoju_Resume.pdf" class="btn btn-sm btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Download PDF</span>
+        </a>
+        <a href="Keerthan_Tunkoju_Resume.pdf" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          <span>Open Fullscreen</span>
+        </a>
+        <a href="resume.html" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          <span>Web Version</span>
+        </a>
+      </div>
+
+      <div class="modal-body" style="padding: 0; height: 75vh;">
+        <object data="Keerthan_Tunkoju_Resume.pdf" type="application/pdf" style="width: 100%; height: 100%; border: none;">
+          <div style="padding: 2rem; text-align: center;">
+            <p style="margin-bottom: 1rem;">PDF preview is directly available for download:</p>
+            <a href="Keerthan_Tunkoju_Resume.pdf" download="Keerthan_Tunkoju_Resume.pdf" class="btn btn-primary">Download Keerthan_Tunkoju_Resume.pdf</a>
+          </div>
+        </object>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Floating Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Scripts: Default Data first, then Main Controller -->
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
