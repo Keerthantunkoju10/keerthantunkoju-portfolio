@@ -43,22 +43,31 @@ The website includes a persistent **SQLite 3** database (`portfolio.db`) managed
 
 ---
 
-## 🔐 Admin Authentication & Credentials
+## 🔐 Private Admin Access & Stealth Mode (Only for You)
+
+The website features **Private Stealth Mode**: the Admin button and controls are **completely hidden from public visitors, recruiters, and employers**. Only you can unlock and access the admin dashboard.
+
+### 🚪 Secret Gateways to Access Admin:
+1. **Secret URL Parameter**: Add `?admin` to your website URL (e.g. `https://your-portfolio.netlify.app/?admin`). This unlocks the admin modal and saves your device as authorized.
+2. **Secret Keyboard Shortcut**: Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> on Windows/Linux (or <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> on Mac) anytime on the site.
+3. **Secret Mobile Gesture**: Tap the **`<Keerthan.dev/>`** logo **3 times rapidly** on any mobile phone or browser to trigger the admin login prompt.
 
 | Setting | Value / Details | Notes |
 | :--- | :--- | :--- |
-| **Admin Trigger** | Lock icon in Header Navigation | Click the lock button or use keyboard shortcut |
+| **Visibility** | Stealth Mode (Hidden from public) | Only reveals on authorized devices or via secret triggers |
 | **Keyboard Shortcut** | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> | Opens Admin Login / CMS Dashboard instantly |
+| **Mobile Gesture** | Triple-tap navbar logo | Opens Admin prompt on smartphones & tablets |
+| **Secret URL** | `https://your-domain/?admin` | Unlocks & authorizes your personal browser |
 | **Default Username** | `admin` | Used for server-side verification |
 | **Default Password** | `admin123` | Can be changed anytime in the **Security** tab |
-| **Security Standard** | Web Crypto API SHA-256 | Cryptographically hashed and validated |
+| **Security Standard** | Web Crypto API SHA-256 | Cryptographically hashed in the browser |
 
 ---
 
 ## ✏️ How Online Editing Works
 
 ### 1. Live In-Place Visual Editing (Click-to-Edit)
-1. Click the **Admin** lock button in the top navigation (or press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>).
+1. Open the Admin prompt using any of the secret triggers above (<kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>, triple-tapping the logo, or `?admin`).
 2. Enter the password `admin123`.
 3. The **Floating Admin Toolbar** will appear across the top.
 4. Toggle **Live Inline Edit** to **ON**.

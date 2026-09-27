@@ -62,7 +62,7 @@
   <!-- Header / Navigation Bar -->
   <header class="site-header" id="header">
     <nav class="navbar container" aria-label="Main Navigation">
-      <a href="#hero" class="nav-logo" aria-label="Keerthan Tunkoju Home">
+      <a href="#hero" class="nav-logo" id="nav-brand-logo" aria-label="Keerthan Tunkoju Home" title="Keerthan.dev">
         <span class="logo-bracket">&lt;</span><span id="nav-brand-name">Keerthan</span><span class="logo-accent">.dev</span><span class="logo-bracket">/&gt;</span>
       </a>
 
@@ -83,8 +83,8 @@
 
       <!-- Header Action Controls -->
       <div class="nav-actions">
-        <!-- Admin Access Button -->
-        <button id="admin-trigger-btn" class="admin-trigger-btn" aria-label="Admin Login (Ctrl+Shift+A)" title="Admin Login (Ctrl+Shift+A)">
+        <!-- Admin Access Button (Hidden by default for visitors, stealth mode) -->
+        <button id="admin-trigger-btn" class="admin-trigger-btn admin-hidden" aria-label="Admin Access" title="Admin Access" style="display: none;">
           <svg class="lock-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
@@ -492,7 +492,7 @@
           </div>
 
           <div class="login-tip">
-            <span>💡 <strong>Default Password:</strong> <code>admin123</code> (You can change this in the Admin Panel anytime)</span>
+            <span>🔒 <strong>Private Admin Access:</strong> Authorized administrator login only.</span>
           </div>
 
           <div class="modal-footer">
@@ -704,10 +704,60 @@
           </div>
         </div>
 
-        <!-- Tab 6: Security (Change Password) -->
+        <!-- Tab 6: Security (Private Access & Password) -->
         <div id="tab-security" class="cms-tab-pane">
+          <!-- Stealth Access Controls -->
+          <div class="stealth-mode-card">
+            <div class="stealth-mode-header">
+              <div class="stealth-badge-wrap">
+                <span class="stealth-badge" id="stealth-status-badge">🔒 Stealth Mode: Enabled (Hidden from Visitors)</span>
+              </div>
+              <h4 class="stealth-title">Private Admin Access</h4>
+              <p class="stealth-desc">The Admin button is completely hidden from public visitors, recruiters, and employers. Only you can activate admin mode using these secret gateways:</p>
+            </div>
+
+            <div class="stealth-methods-grid">
+              <div class="stealth-method-item">
+                <div class="stealth-method-icon">🔗</div>
+                <div class="stealth-method-info">
+                  <strong>Secret URL Gateway (Any Device)</strong>
+                  <span>Add <code>?admin</code> to your website URL to unlock admin access on this device:</span>
+                  <div class="secret-url-chip">
+                    <span id="secret-url-display">https://your-domain.netlify.app/?admin</span>
+                    <button type="button" class="btn btn-sm btn-outline" id="copy-secret-url-btn">Copy URL</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stealth-method-item">
+                <div class="stealth-method-icon">⌨️</div>
+                <div class="stealth-method-info">
+                  <strong>Secret Keyboard Shortcut (Desktop / Laptop)</strong>
+                  <span>Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> (or <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> on Mac) anytime on the site.</span>
+                </div>
+              </div>
+
+              <div class="stealth-method-item">
+                <div class="stealth-method-icon">📱</div>
+                <div class="stealth-method-info">
+                  <strong>Secret Mobile Gesture (Phone / Tablet)</strong>
+                  <span>Tap the <strong>&lt;Keerthan.dev/&gt;</strong> logo <strong>3 times rapidly</strong> to trigger the admin login prompt on mobile.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="stealth-actions-row">
+              <button type="button" class="btn btn-sm btn-outline" id="toggle-device-stealth-btn">
+                Hide Admin Button on This Device
+              </button>
+            </div>
+          </div>
+
+          <hr class="backup-divider">
+
           <form id="change-password-form">
-            <p class="cms-pane-desc">Update your admin login password. The password is cryptographically hashed using SHA-256 in your browser.</p>
+            <h4 class="backup-title">Change Admin Password</h4>
+            <p class="cms-pane-desc">Update your admin password so only you know it. Hashed using SHA-256 before saving.</p>
 
             <div class="form-group">
               <label for="current-pass" class="form-label">Current Admin Password</label>

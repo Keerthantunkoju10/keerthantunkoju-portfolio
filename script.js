@@ -440,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* --------------------------------------------------------------------------
-     4. ADMIN AUTHENTICATION ENGINE (Web Crypto SHA-256)
+     4. ADMIN AUTHENTICATION ENGINE (Web Crypto SHA-256 & Stealth Mode)
      -------------------------------------------------------------------------- */
   const adminTriggerBtn = document.getElementById('admin-trigger-btn');
   const adminToolbar = document.getElementById('admin-toolbar');
@@ -452,6 +452,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const adminLogoutBtn = document.getElementById('admin-logout-btn');
   const editModeCheckbox = document.getElementById('edit-mode-checkbox');
   const editModeStatus = document.getElementById('edit-mode-status');
+
+  const ADMIN_DEVICE_KEY = 'portfolio_admin_device_authorized';
 
   // Compute SHA-256 hex string using browser-native subtle crypto
   const sha256 = async (message) => {
@@ -473,8 +475,40 @@ document.addEventListener('DOMContentLoaded', () => {
     return sessionStorage.getItem(AUTH_KEY) === 'true';
   };
 
+  const isAuthorizedAdminDevice = () => {
+    return isUserAuthenticated() || localStorage.getItem(ADMIN_DEVICE_KEY) === 'true';
+  };
+
+  const updateStealthButtonState = () => {
+    const btn = document.getElementById('toggle-device-stealth-btn');
+    const badge = document.getElementById('stealth-status-badge');
+    const urlDisplay = document.getElementById('secret-url-display');
+    const isAuth = localStorage.getItem(ADMIN_DEVICE_KEY) === 'true';
+
+    if (urlDisplay) {
+      const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : '';
+      const pathname = window.location.pathname || '';
+      urlDisplay.textContent = origin + pathname + '?admin';
+    }
+
+    if (btn) {
+      btn.textContent = isAuth
+        ? 'Hide Admin Button on This Device (100% Stealth Mode)'
+        : 'Keep Admin Button Visible on This Device';
+    }
+
+    if (badge) {
+      if (isAuth) {
+        badge.textContent = '🔒 Stealth Active (Button visible on this device only)';
+      } else {
+        badge.textContent = '🔒 Pure Stealth Mode (Button completely hidden on all devices)';
+      }
+    }
+  };
+
   const updateAdminUI = () => {
     const authenticated = isUserAuthenticated();
+    const isAuthDevice = isAuthorizedAdminDevice();
 
     if (adminToolbar) {
       adminToolbar.hidden = !authenticated;
@@ -482,11 +516,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (adminTriggerBtn) {
       if (authenticated) {
+        adminTriggerBtn.classList.remove('admin-hidden');
+        adminTriggerBtn.style.display = 'inline-flex';
         adminTriggerBtn.classList.add('active');
         adminTriggerBtn.title = 'Admin Active (Click for CMS Dashboard)';
-      } else {
+      } else if (isAuthDevice) {
+        adminTriggerBtn.classList.remove('admin-hidden');
+        adminTriggerBtn.style.display = 'inline-flex';
         adminTriggerBtn.classList.remove('active');
         adminTriggerBtn.title = 'Admin Login (Ctrl+Shift+A)';
+      } else {
+        adminTriggerBtn.classList.add('admin-hidden');
+        adminTriggerBtn.style.display = 'none';
       }
     }
 
@@ -498,6 +539,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!authenticated && isEditModeActive) {
       setEditMode(false);
     }
+
+    updateStealthButtonState();
   };
 
   const loginAdmin = async (password) => {
@@ -507,6 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (computedHash === currentHash) {
       sessionStorage.setItem(AUTH_KEY, 'true');
+      localStorage.setItem(ADMIN_DEVICE_KEY, 'true'); // Authorize device upon login
       if (loginErrorMsg) loginErrorMsg.textContent = '';
       closeModal(adminLoginModal);
       if (adminLoginForm) adminLoginForm.reset();
@@ -516,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showToast('Authenticated as Admin! Visual Edit Mode is now ON.', 'success');
     } else {
       if (loginErrorMsg) {
-        loginErrorMsg.textContent = 'Incorrect admin password. (Default is admin123)';
+        loginErrorMsg.textContent = 'Incorrect admin password.';
       }
       showToast('Authentication failed: Invalid password.', 'error');
     }
@@ -528,6 +572,84 @@ document.addEventListener('DOMContentLoaded', () => {
     updateAdminUI();
     showToast('Logged out from admin session.', 'info');
   };
+
+  // Check secret URL parameters on page load (?admin, ?keerthan, #admin)
+  const checkSecretUrlGateway = () => {
+    const params = new URLSearchParams(window.location.search);
+    const hash = window.location.hash;
+    if (params.has('admin') || params.has('keerthan') || hash === '#admin') {
+      localStorage.setItem(ADMIN_DEVICE_KEY, 'true');
+      updateAdminUI();
+
+      setTimeout(() => {
+        if (isUserAuthenticated()) {
+          openModal(document.getElementById('admin-cms-modal'));
+          populateCmsFields();
+        } else {
+          openModal(adminLoginModal);
+          setTimeout(() => adminPasswordInput && adminPasswordInput.focus(), 150);
+        }
+        showToast('🔒 Admin gateway unlocked for this device.', 'info', 2500);
+      }, 350);
+
+      // Clean address bar so the query string doesn't remain visible
+      if (window.history && window.history.replaceState) {
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    }
+  };
+
+  // Secret Gesture: Triple-click / tap on logo for mobile & desktop stealth access
+  const navBrandLogo = document.getElementById('nav-brand-logo');
+  let logoTapCount = 0;
+  let logoTapTimer = null;
+
+  if (navBrandLogo) {
+    const handleSecretLogoTap = (e) => {
+      logoTapCount++;
+      clearTimeout(logoTapTimer);
+      logoTapTimer = setTimeout(() => {
+        logoTapCount = 0;
+      }, 1200);
+
+      if (logoTapCount >= 3) {
+        logoTapCount = 0;
+        e.preventDefault();
+        localStorage.setItem(ADMIN_DEVICE_KEY, 'true');
+        updateAdminUI();
+
+        if (isUserAuthenticated()) {
+          openModal(document.getElementById('admin-cms-modal'));
+          populateCmsFields();
+        } else {
+          openModal(adminLoginModal);
+          setTimeout(() => adminPasswordInput && adminPasswordInput.focus(), 150);
+        }
+        showToast('🔒 Admin gateway unlocked.', 'info', 2500);
+      }
+    };
+
+    navBrandLogo.addEventListener('click', handleSecretLogoTap);
+  }
+
+  // Keyboard shortcut: Ctrl + Shift + A (or Cmd + Shift + A) to toggle Admin
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+      e.preventDefault();
+      localStorage.setItem(ADMIN_DEVICE_KEY, 'true');
+      updateAdminUI();
+
+      if (isUserAuthenticated()) {
+        openModal(document.getElementById('admin-cms-modal'));
+        populateCmsFields();
+      } else {
+        openModal(adminLoginModal);
+        setTimeout(() => adminPasswordInput && adminPasswordInput.focus(), 150);
+      }
+      showToast('🔒 Admin gateway opened.', 'info', 2000);
+    }
+  });
 
   // Listeners for Auth
   if (adminTriggerBtn) {
@@ -560,19 +682,40 @@ document.addEventListener('DOMContentLoaded', () => {
     adminLogoutBtn.addEventListener('click', logoutAdmin);
   }
 
-  // Keyboard shortcut: Ctrl + Shift + A (or Cmd + Shift + A) to toggle Admin
-  document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
-      e.preventDefault();
-      if (isUserAuthenticated()) {
-        openModal(document.getElementById('admin-cms-modal'));
-        populateCmsFields();
+  // Stealth toggle button in CMS Security Tab
+  const toggleDeviceStealthBtn = document.getElementById('toggle-device-stealth-btn');
+  if (toggleDeviceStealthBtn) {
+    toggleDeviceStealthBtn.addEventListener('click', () => {
+      const isAuth = localStorage.getItem(ADMIN_DEVICE_KEY) === 'true';
+      if (isAuth) {
+        localStorage.removeItem(ADMIN_DEVICE_KEY);
+        updateAdminUI();
+        showToast('Admin button is now 100% hidden on this device.', 'info');
       } else {
-        openModal(adminLoginModal);
-        setTimeout(() => adminPasswordInput && adminPasswordInput.focus(), 150);
+        localStorage.setItem(ADMIN_DEVICE_KEY, 'true');
+        updateAdminUI();
+        showToast('Admin button is now visible on this device.', 'success');
       }
-    }
-  });
+    });
+  }
+
+  // Copy secret admin URL button
+  const copySecretUrlBtn = document.getElementById('copy-secret-url-btn');
+  if (copySecretUrlBtn) {
+    copySecretUrlBtn.addEventListener('click', () => {
+      const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://your-domain.netlify.app';
+      const pathname = window.location.pathname || '';
+      const url = origin + pathname + '?admin';
+      navigator.clipboard.writeText(url).then(() => {
+        showToast('Secret admin URL copied to clipboard!', 'success');
+      }).catch(() => {
+        prompt('Copy your secret admin URL:', url);
+      });
+    });
+  }
+
+  // Run secret URL check on script execution
+  checkSecretUrlGateway();
 
 
   /* --------------------------------------------------------------------------
