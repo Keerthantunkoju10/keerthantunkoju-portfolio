@@ -24,12 +24,12 @@ const defaultPortfolioData = {
         "label": "B.Tech Specialization"
       },
       {
-        "number": "GHMC",
-        "label": "Urban GIS Mapping"
+        "number": "3",
+        "label": "Industry Internships"
       },
       {
-        "number": "3+",
-        "label": "Internships Completed"
+        "number": "2024",
+        "label": "Engineering Graduate"
       }
     ],
     "contact": {
@@ -46,47 +46,34 @@ const defaultPortfolioData = {
   "experience": [
     {
       "id": "exp-1",
-      "role": "GIS Engineer",
-      "company": "NeoGeoInfo Technologies Ltd.",
-      "period": "Feb 2026 – Present",
-      "bullets": [
-        "Digitized urban infrastructure layers including roads, footpaths, electric network, drainage, water bodies, parks, buildings, and land parcels for the Greater Hyderabad Municipal Corporation (GHMC).",
-        "Execute spatial data validation and topology correction to ensure geometric integrity and compliance with project standards.",
-        "Conduct attribute QA/QC using Excel, verifying data completeness, consistency, and accuracy across GIS layers.",
-        "Create and manage GIS layers for multi-stakeholder urban projects, delivering production-ready urban GIS databases supporting city planning.",
-        "Tools utilized: ArcGIS, QGIS, Google Earth, Global Mapper, and Microsoft Excel."
-      ]
-    },
-    {
-      "id": "exp-2",
       "role": "Python Programming Intern",
       "company": "CodSoft",
       "period": "Oct 2023 – Nov 2023",
       "bullets": [
-        "Built a feature-complete To-Do List application in Python with task addition, deletion, and persistent state storage.",
-        "Developed a GUI-based Calculator handling arithmetic computations, floating-point numbers, and error edge cases.",
+        "Built a feature-complete To-Do List application in Python with task add, delete, and persistence functionality.",
+        "Developed a GUI-based Calculator handling arithmetic, floating-point, and error edge cases.",
         "Implemented a Password Generator with configurable length, character sets, and entropy-based strength scoring."
+      ]
+    },
+    {
+      "id": "exp-2",
+      "role": "Web Developer Intern",
+      "company": "Bharat Intern",
+      "period": "Sep 2023 – Oct 2023",
+      "bullets": [
+        "Designed and deployed a personal Portfolio website using HTML, CSS, and JavaScript showcasing projects and skills.",
+        "Built a Temperature Converter tool supporting Celsius, Fahrenheit, and Kelvin conversions with real-time UI feedback.",
+        "Recreated the Netflix homepage as a responsive UI exercise, demonstrating CSS layout and component structuring."
       ]
     },
     {
       "id": "exp-3",
       "role": "Web Developer Intern",
-      "company": "Bharat Intern",
-      "period": "Sep 2023 – Oct 2023",
-      "bullets": [
-        "Designed and deployed a responsive personal Portfolio website using HTML5, CSS3, and JavaScript showcasing projects and skills.",
-        "Built an interactive Temperature Converter tool supporting Celsius, Fahrenheit, and Kelvin conversions with real-time UI feedback.",
-        "Recreated the Netflix Homepage as a responsive UI exercise, mastering CSS layout techniques, Flexbox, and component structuring."
-      ]
-    },
-    {
-      "id": "exp-4",
-      "role": "Web Developer Intern",
       "company": "Intrainz",
       "period": "Jun 2023 – Aug 2023",
       "bullets": [
-        "Developed a full Hotel website frontend using HTML, CSS, and JavaScript including room booking UI, responsive photo gallery, and contact form.",
-        "Completed structured industrial training covering modern front-end development workflows and software engineering best practices."
+        "Developed a full Hotel website frontend using HTML, CSS, and JavaScript including booking UI, gallery, and contact form.",
+        "Completed structured industrial training covering modern front-end development workflows and best practices."
       ]
     }
   ],
@@ -189,7 +176,7 @@ const defaultPortfolioData = {
       ],
       "description": "Led digitization and topological validation of municipal utilities—including road networks, electrical infrastructure, drainage, water bodies, parks, and land parcels—for the Greater Hyderabad Municipal Corporation, delivering a production-ready spatial database for city administration.",
       "githubUrl": "",
-      "liveUrl": "#experience"
+      "liveUrl": ""
     },
     {
       "id": "proj-4",

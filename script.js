@@ -90,6 +90,13 @@ document.addEventListener('DOMContentLoaded', () => {
             portfolioData.certifications = [];
           }
         }
+        // Self-heal stale experience if old GIS role is present from previous sessions
+        if (portfolioData.experience && portfolioData.experience.some(e => (e.role && e.role.toLowerCase().includes('gis')) || (e.company && e.company.toLowerCase().includes('neogeo')))) {
+          if (defaultPortfolioData && defaultPortfolioData.experience) {
+            portfolioData.experience = JSON.parse(JSON.stringify(defaultPortfolioData.experience));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolioData));
+          }
+        }
       } else {
         portfolioData = JSON.parse(JSON.stringify(defaultPortfolioData));
       }
