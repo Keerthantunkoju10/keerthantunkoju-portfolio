@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Resume of Keerthan Tunkoju - Entry-Level Software Developer, AI & ML Graduate, GIS Engineer.">
+  <title>Keerthan Tunkoju | Curriculum Vitae (Resume)</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Specific styles for Resume Viewer Page */
+    .resume-page-wrapper {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+    }
+
+    .resume-top-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-medium);
+    }
+
+    .resume-actions-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .resume-paper {
+      background: #ffffff;
+      color: #1a1a1a;
+      padding: 3rem;
+      border-radius: var(--radius-md);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.5;
+    }
+
+    [data-theme="dark"] .resume-paper {
+      color: #1e293b;
+    }
+
+    .resume-name {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-align: center;
+      color: #0f172a;
+      margin-bottom: 0.35rem;
+    }
+
+    .resume-subtitle {
+      text-align: center;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #475569;
+      font-style: italic;
+      margin-bottom: 0.6rem;
+    }
+
+    .resume-contact-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem 1rem;
+      font-size: 0.85rem;
+      color: #334155;
+      padding-bottom: 1.25rem;
+      border-bottom: 1.5px solid #0f172a;
+      margin-bottom: 1.5rem;
+    }
+
+    .resume-contact-bar a {
+      color: #2563eb;
+      text-decoration: underline;
+    }
+
+    .resume-sec-title {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #0f172a;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 0.25rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .resume-summary-text {
+      font-size: 0.875rem;
+      color: #334155;
+      text-align: justify;
+    }
+
+    .skills-line {
+      font-size: 0.85rem;
+      margin-bottom: 0.35rem;
+      color: #334155;
+    }
+
+    .skills-line strong {
+      color: #0f172a;
+    }
+
+    .job-entry {
+      margin-bottom: 1.25rem;
+    }
+
+    .job-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 0.9rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .job-title-company {
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .job-dates {
+      font-size: 0.8rem;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .job-bullets {
+      list-style: none;
+      padding-left: 0;
+      font-size: 0.85rem;
+      color: #334155;
+    }
+
+    .job-bullets li {
+      position: relative;
+      padding-left: 1.25rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .job-bullets li::before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      color: #0f172a;
+    }
+
+    .embedded-pdf-preview {
+      margin-top: 3rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+    }
+
+    .embedded-pdf-preview h3 {
+      margin-bottom: 1rem;
+      font-size: 1.1rem;
+    }
+
+    .pdf-frame {
+      width: 100%;
+      height: 700px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+      .resume-top-actions, .embedded-pdf-preview, .site-header, .site-footer {
+        display: none !important;
+      }
+      .resume-page-wrapper {
+        margin: 0 !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+      .resume-paper {
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .resume-paper {
+        padding: 1.5rem;
+      }
+      .resume-name {
+        font-size: 1.4rem;
+      }
+      .resume-top-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .resume-actions-group {
+        width: 100%;
+      }
+      .resume-actions-group .btn {
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <main class="resume-page-wrapper">
+    <!-- Top Action Bar -->
+    <div class="resume-top-actions">
+      <a href="index.html" class="btn btn-secondary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        <span>Back to Website</span>
+      </a>
+
+      <div class="resume-actions-group">
+        <button onclick="window.print()" class="btn btn-outline" title="Print resume">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          <span>Print</span>
+        </button>
+
+        <a href="Keerthan_Tunkoju_Resume.pdf" download="Keerthan_Tunkoju_Resume.pdf" class="btn btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Download PDF</span>
+        </a>
+
+        <a href="Keerthan_Tunkoju_Resume.pdf" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          <span>Open PDF</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Clean Printable Resume Sheet -->
+    <article class="resume-paper" id="resume-content">
+      <header>
+        <h1 class="resume-name">KEERTHAN TUNKOJU</h1>
+        <p class="resume-subtitle">Entry-Level Software Developer | AI &amp; ML Graduate</p>
+        <div class="resume-contact-bar">
+          <span>+91 6281151724</span>
+          <span>•</span>
+          <a href="mailto:keerthantunkoju10@gmail.com">keerthantunkoju10@gmail.com</a>
+          <span>•</span>
+          <a href="https://linkedin.com/in/keerthan-tunkoju-a24604258" target="_blank">linkedin.com/in/keerthan-tunkoju-a24604258</a>
+          <span>•</span>
+          <a href="https://github.com/Keerthantunkoju10" target="_blank">github.com/Keerthantunkoju10</a>
+        </div>
+      </header>
+
+      <!-- Professional Summary -->
+      <section>
+        <h2 class="resume-sec-title">PROFESSIONAL SUMMARY</h2>
+        <p class="resume-summary-text">
+          AI/ML-focused Computer Science graduate and practicing GIS Engineer with experience in spatial data digitization, topology validation, and urban infrastructure mapping. Delivered end-to-end projects spanning convolutional neural networks for medical imaging and ML-driven agricultural prediction models. Currently contributing to large-scale urban GIS initiatives at NeoGeoInfo Technologies using ArcGIS, QGIS, and Google Earth.
+        </p>
+      </section>
+
+      <!-- Technical Skills -->
+      <section>
+        <h2 class="resume-sec-title">TECHNICAL SKILLS</h2>
+        <p class="skills-line"><strong>Languages:</strong> Python, C, C++, JavaScript, SQL</p>
+        <p class="skills-line"><strong>Web Technologies:</strong> HTML5, CSS3, JavaScript</p>
+        <p class="skills-line"><strong>ML / AI:</strong> Convolutional Neural Networks (CNN), Supervised Learning, scikit-learn, Deep Learning</p>
+        <p class="skills-line"><strong>GIS Tools:</strong> ArcGIS, QGIS, Google Earth, Global Mapper</p>
+        <p class="skills-line"><strong>GIS Skills:</strong> Spatial Data Digitization, Topology Validation, Attribute QA/QC, Layer Management</p>
+        <p class="skills-line"><strong>Tools &amp; Version Control:</strong> Git, GitHub, Microsoft Excel</p>
+        <p class="skills-line"><strong>Databases:</strong> SQL (MySQL)</p>
+        <p class="skills-line"><strong>Soft Skills:</strong> Problem Solving, Team Leadership, Communication</p>
+      </section>
+
+      <!-- Professional Experience -->
+      <section>
+        <h2 class="resume-sec-title">PROFESSIONAL EXPERIENCE</h2>
+        <div class="job-entry">
+          <div class="job-header">
+            <span class="job-title-company">GIS Engineer | NeoGeoInfo Technologies Ltd.</span>
+            <span class="job-dates">Feb 2026 – Present</span>
+          </div>
+          <ul class="job-bullets">
+            <li>Perform utilities digitization of roads, footpaths, electric networks, drainage, water bodies, parks, and government properties for urban infrastructure projects.</li>
+            <li>Execute spatial data validation and topology correction to ensure geometric integrity and compliance with project standards.</li>
+            <li>Conduct attribute QA/QC using Excel, verifying data completeness, consistency, and accuracy across GIS layers.</li>
+            <li>Create and manage GIS layers for multi-stakeholder urban projects, ensuring high-accuracy data delivery on time.</li>
+            <li>Digitized urban infrastructure layers including roads, footpaths, electric network, drainage, water bodies, parks, buildings, and land parcels for the Greater Hyderabad Municipal Corporation (GHMC).</li>
+            <li>Performed topology validation, attribute accuracy checks, and basemap correction using ArcGIS, QGIS, Google Earth, and Global Mapper.</li>
+            <li>Delivered an accurate, production-ready urban GIS database supporting city planning and infrastructure management.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Internship Experience -->
+      <section>
+        <h2 class="resume-sec-title">INTERNSHIP EXPERIENCE</h2>
+        <div class="job-entry">
+          <div class="job-header">
+            <span class="job-title-company">Python Programming Intern | CodSoft</span>
+            <span class="job-dates">Oct 2023 – Nov 2023</span>
+          </div>
+          <ul class="job-bullets">
+            <li>Built a feature-complete To-Do List application in Python with task add, delete, and persistence functionality.</li>
+            <li>Developed a GUI-based Calculator handling arithmetic, floating-point, and error edge cases.</li>
+            <li>Implemented a Password Generator with configurable length, character sets, and entropy-based strength scoring.</li>
+          </ul>
+        </div>
+
+        <div class="job-entry">
+          <div class="job-header">
+            <span class="job-title-company">Web Developer Intern | Bharat Intern</span>
+            <span class="job-dates">Sep 2023 – Oct 2023</span>
+          </div>
+          <ul class="job-bullets">
+            <li>Designed and deployed a personal Portfolio website using HTML, CSS, and JavaScript showcasing projects and skills.</li>
+            <li>Built a Temperature Converter tool supporting Celsius, Fahrenheit, and Kelvin conversions with real-time UI feedback.</li>
+            <li>Recreated the Netflix homepage as a responsive UI exercise, demonstrating CSS layout and component structuring.</li>
+          </ul>
+        </div>
+
+        <div class="job-entry">
+          <div class="job-header">
+            <span class="job-title-company">Web Developer Intern | Intrainz</span>
+            <span class="job-dates">Jun 2023 – Aug 2023</span>
+          </div>
+          <ul class="job-bullets">
+            <li>Developed a full Hotel website frontend using HTML, CSS, and JavaScript including booking UI, gallery, and contact form.</li>
+            <li>Completed structured industrial training covering modern front-end development workflows and best practices.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Academic Projects -->
+      <section>
+        <h2 class="resume-sec-title">ACADEMIC PROJECTS</h2>
+        <div class="job-entry">
+          <div class="job-header">
+            <span class="job-title-company">Crop Yield Prediction Using Machine Learning</span>
+          </div>
+          <ul class="job-bullets">
+            <li>Designed and implemented an ML pipeline to predict crop yields based on soil type, weather conditions, crop management practices, and historical records, targeting a key challenge for India's agriculture-dependent economy.</li>
+            <li>Applied and benchmarked multiple supervised learning techniques to model non-linear relationships between input features and crop yield output variables.</li>
+            <li>Addressed key limitations of neural network approaches including relative error reduction and prediction efficiency, contributing to improved model robustness for real-world agricultural deployment.</li>
+            <li>Synthesized a systematic review of AI-based Crop Yield Prediction (CYP) methods, extracting and evaluating feature sets used across the literature to inform model design.</li>
+          </ul>
+        </div>
+
+        <div class="job-entry">
+          <div class="job-header">
+            <span class="job-title-company">Deep Learning Methods for Identifying Brain Tumors</span>
+          </div>
+          <ul class="job-bullets">
+            <li>Built deep learning models using Convolutional Neural Networks (CNN) and watershed algorithms to perform automated semantic segmentation of brain MRI images, reducing the manual burden of clinical image analysis.</li>
+            <li>Trained and evaluated CNN architectures on the BraTS dataset, experimenting with regularization techniques and hyperparameter tuning to optimize segmentation accuracy against heterogeneous tumor structures.</li>
+            <li>Deployed a web application to expose the trained models to medical practitioners, enabling point-of-care inference without requiring local ML environment setup.</li>
+            <li>Addressed challenges of spatial and structural heterogeneity in brain tumors to develop a dependable automated segmentation pipeline suitable for clinical settings.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Education -->
+      <section>
+        <h2 class="resume-sec-title">EDUCATION</h2>
+        <div class="job-entry">
+          <div class="job-header">
+            <span class="job-title-company">B.Tech in Computer Science &amp; Engineering (AI &amp; ML) | Sri Indu Institute of Engineering &amp; Technology</span>
+            <span class="job-dates">2020 – 2024</span>
+          </div>
+          <p class="skills-line"><strong>CGPA:</strong> 6.6 / 10.0</p>
+          <p class="skills-line"><strong>Relevant coursework:</strong> Machine Learning, Deep Learning, Data Structures &amp; Algorithms, Database Management Systems, Computer Networks.</p>
+        </div>
+
+        <div class="job-entry">
+          <div class="job-header">
+            <span class="job-title-company">Intermediate — MPC (Mathematics, Physics, Chemistry) | Narayana Jr College</span>
+            <span class="job-dates">2018 – 2020</span>
+          </div>
+          <p class="skills-line"><strong>Percentage:</strong> 75%</p>
+        </div>
+      </section>
+
+      <!-- Certifications -->
+      <section>
+        <h2 class="resume-sec-title">CERTIFICATIONS</h2>
+        <ul class="job-bullets">
+          <li>Web Development Internship Certification — Intrainz (2023)</li>
+          <li>Python Programming Internship Certification — CodSoft (2023)</li>
+        </ul>
+      </section>
+    </article>
+
+    <!-- Original PDF Embed Preview -->
+    <section class="embedded-pdf-preview">
+      <h3>📄 Original PDF Document Preview</h3>
+      <object data="Keerthan_Tunkoju_Resume.pdf" type="application/pdf" class="pdf-frame">
+        <p>Your browser does not support embedded PDF viewing. You can <a href="Keerthan_Tunkoju_Resume.pdf" download="Keerthan_Tunkoju_Resume.pdf" class="text-highlight">download the PDF file directly</a>.</p>
+      </object>
+    </section>
+  </main>
+
+</body>
+</html>
