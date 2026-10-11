@@ -80,10 +80,12 @@ const defaultPortfolioData = {
   "skills": [
     {
       "id": "cat-1",
-      "title": "Languages & Web",
-      "desc": "Programming languages and web technologies used for core application development.",
+      "title": "Languages & Web Technologies",
+      "desc": "Programming languages and responsive web technologies used for core application development.",
       "tags": [
         "Python",
+        "C",
+        "C++",
         "JavaScript",
         "SQL (MySQL)",
         "HTML5",
@@ -105,28 +107,15 @@ const defaultPortfolioData = {
     },
     {
       "id": "cat-3",
-      "title": "GIS & Spatial Engineering",
-      "desc": "Geographic Information Systems tools, urban digitization, and spatial quality control.",
-      "tags": [
-        "ArcGIS",
-        "QGIS",
-        "Google Earth",
-        "Global Mapper",
-        "Spatial Data Digitization",
-        "Topology Validation & QA/QC"
-      ]
-    },
-    {
-      "id": "cat-4",
-      "title": "Tools, Data & Leadership",
+      "title": "Tools, Databases & Professional Skills",
       "desc": "Workflow tooling, relational databases, and collaborative team competencies.",
       "tags": [
         "Git & GitHub",
-        "MySQL Database",
-        "Microsoft Excel (Data QA)",
+        "SQL (MySQL)",
+        "Microsoft Excel",
         "Problem Solving",
         "Team Leadership",
-        "Technical Communication"
+        "Communication"
       ]
     }
   ],
@@ -164,22 +153,6 @@ const defaultPortfolioData = {
     },
     {
       "id": "proj-3",
-      "title": "Urban Infrastructure Spatial Mapping (GHMC)",
-      "categoryBadge": "GIS & Spatial Engineering",
-      "mockupSub": "GHMC Urban Infrastructure",
-      "gradientClass": "preview-gradient-3",
-      "tags": [
-        "ArcGIS",
-        "QGIS",
-        "Topology QA",
-        "Excel"
-      ],
-      "description": "Led digitization and topological validation of municipal utilities—including road networks, electrical infrastructure, drainage, water bodies, parks, and land parcels—for the Greater Hyderabad Municipal Corporation, delivering a production-ready spatial database for city administration.",
-      "githubUrl": "",
-      "liveUrl": ""
-    },
-    {
-      "id": "proj-4",
       "title": "Hotel Booking Website & Utility Suite",
       "categoryBadge": "Frontend & Python Tools",
       "mockupSub": "Web & Python Suite",

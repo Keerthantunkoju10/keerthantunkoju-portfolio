@@ -97,6 +97,20 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolioData));
           }
         }
+        // Self-heal stale skills if old GIS skill category is present from previous sessions
+        if (portfolioData.skills && portfolioData.skills.some(s => s.title && s.title.toLowerCase().includes('gis'))) {
+          if (defaultPortfolioData && defaultPortfolioData.skills) {
+            portfolioData.skills = JSON.parse(JSON.stringify(defaultPortfolioData.skills));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolioData));
+          }
+        }
+        // Self-heal stale projects if old GIS project is present from previous sessions
+        if (portfolioData.projects && portfolioData.projects.some(p => (p.title && p.title.toLowerCase().includes('spatial')) || (p.categoryBadge && p.categoryBadge.toLowerCase().includes('gis')))) {
+          if (defaultPortfolioData && defaultPortfolioData.projects) {
+            portfolioData.projects = JSON.parse(JSON.stringify(defaultPortfolioData.projects));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolioData));
+          }
+        }
       } else {
         portfolioData = JSON.parse(JSON.stringify(defaultPortfolioData));
       }
