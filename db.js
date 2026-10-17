@@ -41,7 +41,7 @@ class PortfolioDatabase {
         )
       `);
 
-      // 2. Contact Messages Table (stores form submissions)
+      // 2. Contact Messages Table (stores form submissions & reply history)
       this.db.run(`
         CREATE TABLE IF NOT EXISTS contact_messages (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,11 +50,56 @@ class PortfolioDatabase {
           subject TEXT,
           message TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          is_read INTEGER DEFAULT 0
+          is_read INTEGER DEFAULT 0,
+          status TEXT DEFAULT 'unread',
+          replied_at DATETIME,
+          reply_body TEXT,
+          reply_subject TEXT,
+          email_alert_status TEXT DEFAULT 'pending'
         )
       `);
 
-      // 3. Admin Credentials Table
+      // Migration: safely ensure newly added columns exist in older SQLite databases
+      this.db.all(`PRAGMA table_info(contact_messages)`, (err, columns) => {
+        if (!err && columns) {
+          const colNames = columns.map(c => c.name);
+          if (!colNames.includes('status')) {
+            this.db.run(`ALTER TABLE contact_messages ADD COLUMN status TEXT DEFAULT 'unread'`);
+          }
+          if (!colNames.includes('replied_at')) {
+            this.db.run(`ALTER TABLE contact_messages ADD COLUMN replied_at DATETIME`);
+          }
+          if (!colNames.includes('reply_body')) {
+            this.db.run(`ALTER TABLE contact_messages ADD COLUMN reply_body TEXT`);
+          }
+          if (!colNames.includes('reply_subject')) {
+            this.db.run(`ALTER TABLE contact_messages ADD COLUMN reply_subject TEXT`);
+          }
+          if (!colNames.includes('email_alert_status')) {
+            this.db.run(`ALTER TABLE contact_messages ADD COLUMN email_alert_status TEXT DEFAULT 'pending'`);
+          }
+        }
+      });
+
+      // 3. Mail Integration & SMTP Settings Table
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS mail_settings (
+          id TEXT PRIMARY KEY,
+          provider TEXT DEFAULT 'gmail',
+          host TEXT DEFAULT 'smtp.gmail.com',
+          port INTEGER DEFAULT 465,
+          secure INTEGER DEFAULT 1,
+          auth_user TEXT DEFAULT 'keerthantunkoju10@gmail.com',
+          auth_pass TEXT DEFAULT '',
+          from_name TEXT DEFAULT 'Keerthan Tunkoju Portfolio',
+          from_email TEXT DEFAULT 'keerthantunkoju10@gmail.com',
+          notify_email TEXT DEFAULT 'keerthantunkoju10@gmail.com',
+          notify_enabled INTEGER DEFAULT 1,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // 4. Admin Credentials Table
       this.db.run(`
         CREATE TABLE IF NOT EXISTS admin_users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +109,7 @@ class PortfolioDatabase {
         )
       `);
 
-      // 4. Activity Audit Logs
+      // 5. Activity Audit Logs
       this.db.run(`
         CREATE TABLE IF NOT EXISTS activity_logs (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,6 +143,20 @@ class PortfolioDatabase {
             (insertErr) => {
               if (insertErr) console.error('Error seeding admin user:', insertErr);
               else console.log('🌱 Seeded default admin user (username: "admin", password: "Keerthan@2024").');
+            }
+          );
+        }
+      });
+
+      // Seed Default Mail Settings if table is empty
+      this.db.get(`SELECT COUNT(*) as count FROM mail_settings WHERE id = 'default'`, (err, row) => {
+        if (!err && row && row.count === 0) {
+          this.db.run(
+            `INSERT INTO mail_settings (id, provider, host, port, secure, auth_user, auth_pass, from_name, from_email, notify_email, notify_enabled)
+             VALUES ('default', 'gmail', 'smtp.gmail.com', 465, 1, 'keerthantunkoju10@gmail.com', '', 'Keerthan Tunkoju Portfolio', 'keerthantunkoju10@gmail.com', 'keerthantunkoju10@gmail.com', 1)`,
+            (insertErr) => {
+              if (insertErr) console.error('Error seeding mail settings:', insertErr);
+              else console.log('🌱 Seeded default mail settings for keerthantunkoju10@gmail.com.');
             }
           );
         }
@@ -170,11 +229,11 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   // Save new contact form inquiry
-  saveMessage({ name, email, subject, message }) {
+  saveMessage({ name, email, subject, message, email_alert_status = 'pending' }) {
     return new Promise((resolve, reject) => {
       this.db.run(
-        `INSERT INTO contact_messages (name, email, subject, message) VALUES (?, ?, ?, ?)`,
-        [name, email, subject || 'General Inquiry', message],
+        `INSERT INTO contact_messages (name, email, subject, message, status, is_read, email_alert_status) VALUES (?, ?, ?, ?, 'unread', 0, ?)`,
+        [name, email, subject || 'General Inquiry', message, email_alert_status],
         function(err) {
           if (err) return reject(err);
           resolve({ success: true, messageId: this.lastID });
@@ -183,11 +242,14 @@ if (typeof module !== 'undefined' && module.exports) {
     });
   }
 
-  // Retrieve all contact messages for admin
+  // Retrieve all contact messages for admin (with replies and statuses)
   getMessages() {
     return new Promise((resolve, reject) => {
       this.db.all(
-        `SELECT id, name, email, subject, message, created_at, is_read 
+        `SELECT id, name, email, subject, message, created_at, is_read,
+                COALESCE(status, CASE WHEN is_read = 1 THEN 'read' ELSE 'unread' END) as status,
+                replied_at, reply_body, reply_subject,
+                COALESCE(email_alert_status, 'pending') as email_alert_status
          FROM contact_messages 
          ORDER BY created_at DESC`,
         (err, rows) => {
@@ -208,13 +270,128 @@ if (typeof module !== 'undefined' && module.exports) {
     });
   }
 
-  // Mark message as read
-  markMessageRead(id) {
+  // Mark message read or unread
+  markMessageRead(id, isRead = 1) {
     return new Promise((resolve, reject) => {
-      this.db.run(`UPDATE contact_messages SET is_read = 1 WHERE id = ?`, [id], function(err) {
+      const readVal = isRead ? 1 : 0;
+      const statusVal = isRead ? 'read' : 'unread';
+      this.db.run(
+        `UPDATE contact_messages 
+         SET is_read = ?, status = CASE WHEN status = 'replied' THEN 'replied' ELSE ? END 
+         WHERE id = ?`,
+        [readVal, statusVal, id],
+        function(err) {
+          if (err) return reject(err);
+          resolve({ success: true, changes: this.changes });
+        }
+      );
+    });
+  }
+
+  // Update message status directly ('unread', 'read', 'replied')
+  updateMessageStatus(id, status, isRead = null) {
+    return new Promise((resolve, reject) => {
+      let query = `UPDATE contact_messages SET status = ?`;
+      let params = [status];
+      if (isRead !== null) {
+        query += `, is_read = ?`;
+        params.push(isRead ? 1 : 0);
+      }
+      query += ` WHERE id = ?`;
+      params.push(id);
+      this.db.run(query, params, function(err) {
         if (err) return reject(err);
         resolve({ success: true, changes: this.changes });
       });
+    });
+  }
+
+  // Save email reply details for a message
+  saveMessageReply(id, { replySubject, replyBody }) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `UPDATE contact_messages 
+         SET status = 'replied', is_read = 1, replied_at = CURRENT_TIMESTAMP, reply_subject = ?, reply_body = ?
+         WHERE id = ?`,
+        [replySubject || 'Re: Portfolio Inquiry', replyBody || '', id],
+        function(err) {
+          if (err) return reject(err);
+          resolve({ success: true, changes: this.changes });
+        }
+      );
+    });
+  }
+
+  // Update email alert delivery status for an inquiry
+  updateEmailAlertStatus(id, alertStatus) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        `UPDATE contact_messages SET email_alert_status = ? WHERE id = ?`,
+        [alertStatus, id],
+        function(err) {
+          if (err) return reject(err);
+          resolve({ success: true, changes: this.changes });
+        }
+      );
+    });
+  }
+
+  // Retrieve Mail & SMTP Settings
+  getMailSettings() {
+    return new Promise((resolve, reject) => {
+      this.db.get(`SELECT * FROM mail_settings WHERE id = 'default'`, (err, row) => {
+        if (err) return reject(err);
+        if (row) {
+          resolve(row);
+        } else {
+          resolve({
+            id: 'default',
+            provider: 'gmail',
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: 1,
+            auth_user: 'keerthantunkoju10@gmail.com',
+            auth_pass: '',
+            from_name: 'Keerthan Tunkoju Portfolio',
+            from_email: 'keerthantunkoju10@gmail.com',
+            notify_email: 'keerthantunkoju10@gmail.com',
+            notify_enabled: 1
+          });
+        }
+      });
+    });
+  }
+
+  // Save Mail & SMTP Settings
+  saveMailSettings(s) {
+    return new Promise((resolve, reject) => {
+      this.getMailSettings().then(existing => {
+        const passToSave = (s.auth_pass && s.auth_pass !== '••••••••')
+          ? s.auth_pass
+          : (existing ? existing.auth_pass : '');
+
+        this.db.run(
+          `INSERT OR REPLACE INTO mail_settings 
+           (id, provider, host, port, secure, auth_user, auth_pass, from_name, from_email, notify_email, notify_enabled, updated_at) 
+           VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          [
+            s.provider || 'gmail',
+            s.host || 'smtp.gmail.com',
+            Number(s.port) || 465,
+            s.secure ? 1 : 0,
+            s.auth_user || '',
+            passToSave,
+            s.from_name || 'Keerthan Tunkoju Portfolio',
+            s.from_email || 'keerthantunkoju10@gmail.com',
+            s.notify_email || 'keerthantunkoju10@gmail.com',
+            s.notify_enabled ? 1 : 0
+          ],
+          function(err) {
+            if (err) return reject(err);
+            resolve({ success: true });
+          }
+        );
+      }).catch(reject);
     });
   }
 

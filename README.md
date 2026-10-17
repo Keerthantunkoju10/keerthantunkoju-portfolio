@@ -26,20 +26,27 @@ The website includes a persistent **SQLite 3** database (`portfolio.db`) managed
 | Table Name | Description |
 | :--- | :--- |
 | `portfolio_content` | Stores the complete portfolio JSON state (hero, bio, experience, projects, skills, contact info). |
-| `contact_messages` | Stores all incoming inquiries submitted via the website's contact form (name, email, subject, message, timestamp, status). |
+| `contact_messages` | Stores all incoming inquiries submitted via the contact form (name, email, subject, message, timestamp, status, reply history, and email alert delivery tracking). |
+| `mail_settings` | Stores SMTP credentials, notification preferences, alert destination (`keerthantunkoju10@gmail.com`), and outgoing email presets. |
 | `admin_users` | Stores administrator credentials with SHA-256 password hashes. |
 | `activity_logs` | Logs audit events such as portfolio content saves, message submissions, and admin logins. |
 
 ### REST API Endpoints:
 - `GET /api/portfolio` — Fetches current portfolio content from SQLite (with fallback to default data).
 - `POST /api/portfolio` — Saves updated portfolio content directly into SQLite `portfolio_content`.
-- `POST /api/contact` — Persists a visitor's contact inquiry into SQLite `contact_messages`.
+- `POST /api/contact` — Persists a visitor's contact inquiry into SQLite `contact_messages` and automatically dispatches an instant email notification to Keerthan.
 - `GET /api/messages` — Retrieves visitor messages for the Admin CMS Inbox.
+- `PATCH /api/messages/:id/status` — Updates read/unread/replied status of an inquiry.
+- `POST /api/messages/:id/reply` — Records an email reply directly in SQLite.
 - `DELETE /api/messages/:id` — Deletes a message by ID from SQLite.
+- `GET /api/mail/settings` — Returns current mail notification and SMTP configuration.
+- `POST /api/mail/settings` — Updates and persists mail configuration to SQLite.
+- `POST /api/mail/test` — Verifies SMTP connection by dispatching a test email.
+- `POST /api/mail/send-reply` — Delivers a direct email reply to a recruiter/visitor via Nodemailer SMTP.
 - `GET /api/database/stats` — Returns real-time database diagnostics (file size, total messages, active tables, engine type).
 - `POST /api/auth/login` — Verifies administrator credentials against SQLite `admin_users`.
 
-> **Note**: If run without Node.js (e.g. on GitHub Pages or static hosts), the website automatically falls back to browser `localStorage` seamlessly.
+> **Note**: If run without Node.js (e.g. on GitHub Pages or static hosts), the website automatically falls back to browser `localStorage` and provides 1-Click direct Gmail Web and Outlook compose links seamlessly.
 
 ---
 
