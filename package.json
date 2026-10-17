@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "nodemailer": "^10.1.2",
     "sqlite3": "^6.0.1"
   }
 }

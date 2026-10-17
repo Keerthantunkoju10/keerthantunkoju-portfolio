@@ -13,6 +13,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const db = require('./db.js');
+const mailer = require('./mailer.js');
 
 const PORT = process.env.PORT || 3000;
 
@@ -34,8 +35,8 @@ const sendJson = (res, statusCode, data) => {
   res.writeHead(statusCode, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   });
   res.end(JSON.stringify(data));
 };
@@ -61,8 +62,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
     });
     return res.end();
   }
@@ -207,7 +208,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ==========================================
-  // 2. API: Contact Messages (SQLite DB)
+  // 2. API: Contact Messages & Mail Integration
   // ==========================================
   if (url.pathname === '/api/contact' && req.method === 'POST') {
     try {
@@ -215,8 +216,41 @@ const server = http.createServer(async (req, res) => {
       if (!name || !email || !message) {
         return sendJson(res, 400, { error: 'Name, email, and message are required.' });
       }
+
+      // 1. Save inquiry into SQLite database
       const saved = await db.saveMessage({ name, email, subject, message });
-      return sendJson(res, 201, { success: true, message: 'Inquiry saved to database', id: saved.messageId });
+
+      // 2. Dispatch email notification to Keerthan's configured address
+      let emailNotificationResult = { skipped: true };
+      try {
+        const mailSettings = await db.getMailSettings();
+        if (mailSettings && mailSettings.notify_enabled) {
+          emailNotificationResult = await mailer.sendContactNotification({
+            name,
+            email,
+            subject,
+            message
+          }, mailSettings);
+
+          if (emailNotificationResult.success) {
+            await db.updateEmailAlertStatus(saved.messageId, 'sent');
+          } else if (emailNotificationResult.unconfigured) {
+            await db.updateEmailAlertStatus(saved.messageId, 'unconfigured');
+          } else {
+            await db.updateEmailAlertStatus(saved.messageId, 'failed');
+          }
+        }
+      } catch (mailErr) {
+        console.warn('⚠️ Mail notification failed (inquiry safe in DB):', mailErr.message);
+        await db.updateEmailAlertStatus(saved.messageId, 'failed');
+      }
+
+      return sendJson(res, 201, {
+        success: true,
+        message: 'Inquiry saved to database',
+        id: saved.messageId,
+        mailNotification: emailNotificationResult
+      });
     } catch (err) {
       return sendJson(res, 500, { error: 'Failed to record message in database: ' + err.message });
     }
@@ -231,6 +265,30 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Update read / unread status of a message
+  if (url.pathname.match(/^\/api\/messages\/(\d+)\/status$/) && (req.method === 'PATCH' || req.method === 'POST')) {
+    const id = url.pathname.match(/^\/api\/messages\/(\d+)\/status$/)[1];
+    try {
+      const { status, isRead } = await parseBody(req);
+      await db.updateMessageStatus(id, status, isRead);
+      return sendJson(res, 200, { success: true, id, status, isRead });
+    } catch (err) {
+      return sendJson(res, 500, { error: 'Failed to update message status: ' + err.message });
+    }
+  }
+
+  // Record a reply in database (whether sent via SMTP or external webmail)
+  if (url.pathname.match(/^\/api\/messages\/(\d+)\/reply$/) && req.method === 'POST') {
+    const id = url.pathname.match(/^\/api\/messages\/(\d+)\/reply$/)[1];
+    try {
+      const { replySubject, replyBody } = await parseBody(req);
+      await db.saveMessageReply(id, { replySubject, replyBody });
+      return sendJson(res, 200, { success: true, id, message: 'Reply recorded in database.' });
+    } catch (err) {
+      return sendJson(res, 500, { error: 'Failed to record reply: ' + err.message });
+    }
+  }
+
   if (url.pathname.startsWith('/api/messages/') && req.method === 'DELETE') {
     const id = url.pathname.split('/').pop();
     try {
@@ -238,6 +296,111 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { success: true, deletedId: id });
     } catch (err) {
       return sendJson(res, 500, { error: 'Failed to delete message: ' + err.message });
+    }
+  }
+
+  // ==========================================
+  // 3. API: Mail Integration & SMTP Settings
+  // ==========================================
+  if (url.pathname === '/api/mail/settings') {
+    if (req.method === 'GET') {
+      try {
+        const settings = await db.getMailSettings();
+        const safe = {
+          provider: settings.provider || 'gmail',
+          host: settings.host || 'smtp.gmail.com',
+          port: settings.port || 465,
+          secure: Boolean(settings.secure),
+          auth_user: settings.auth_user || '',
+          hasPassword: Boolean(settings.auth_pass && settings.auth_pass.length > 0),
+          auth_pass: settings.auth_pass ? '••••••••' : '',
+          from_name: settings.from_name || 'Keerthan Tunkoju Portfolio',
+          from_email: settings.from_email || 'keerthantunkoju10@gmail.com',
+          notify_email: settings.notify_email || 'keerthantunkoju10@gmail.com',
+          notify_enabled: Boolean(settings.notify_enabled),
+          updated_at: settings.updated_at
+        };
+        return sendJson(res, 200, safe);
+      } catch (err) {
+        return sendJson(res, 500, { error: 'Failed to load mail settings: ' + err.message });
+      }
+    }
+
+    if (req.method === 'POST') {
+      try {
+        const body = await parseBody(req);
+        await db.saveMailSettings(body);
+        return sendJson(res, 200, { success: true, message: 'Mail settings saved successfully' });
+      } catch (err) {
+        return sendJson(res, 500, { error: 'Failed to save mail settings: ' + err.message });
+      }
+    }
+  }
+
+  // Test email dispatch to verify SMTP credentials
+  if (url.pathname === '/api/mail/test' && req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const settings = await db.getMailSettings();
+      // If a temporary password was passed in the test request, use it for testing
+      if (body.auth_pass && body.auth_pass !== '••••••••') {
+        settings.auth_pass = body.auth_pass;
+      }
+      if (body.auth_user) settings.auth_user = body.auth_user;
+      if (body.host) settings.host = body.host;
+      if (body.port) settings.port = body.port;
+      if (body.provider) settings.provider = body.provider;
+
+      const targetEmail = body.targetEmail || settings.notify_email || 'keerthantunkoju10@gmail.com';
+      const result = await mailer.sendTestEmail(targetEmail, settings);
+      return sendJson(res, 200, {
+        success: true,
+        message: `Test email successfully sent to ${targetEmail}! Check your inbox.`,
+        details: result
+      });
+    } catch (err) {
+      return sendJson(res, 400, {
+        success: false,
+        error: 'SMTP Test Failed: ' + err.message
+      });
+    }
+  }
+
+  // Send direct email reply from CMS Dashboard to visitor
+  if (url.pathname === '/api/mail/send-reply' && req.method === 'POST') {
+    try {
+      const { messageId, to, subject, replyText, originalMessage, originalSenderName } = await parseBody(req);
+      if (!to || !replyText) {
+        return sendJson(res, 400, { error: 'Recipient email and reply text are required.' });
+      }
+
+      const settings = await db.getMailSettings();
+      const sendResult = await mailer.sendDirectReply({
+        to,
+        subject: subject || 'Re: Portfolio Inquiry',
+        replyText,
+        originalMessage,
+        originalSenderName
+      }, settings);
+
+      // Record reply in database
+      if (messageId) {
+        await db.saveMessageReply(messageId, {
+          replySubject: subject || 'Re: Portfolio Inquiry',
+          replyBody: replyText
+        });
+      }
+
+      return sendJson(res, 200, {
+        success: true,
+        message: `Reply email successfully delivered to ${to}`,
+        details: sendResult
+      });
+    } catch (err) {
+      return sendJson(res, 400, {
+        success: false,
+        error: 'Email reply could not be sent: ' + err.message
+      });
     }
   }
 
