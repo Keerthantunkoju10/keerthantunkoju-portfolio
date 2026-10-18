@@ -13,11 +13,10 @@ const defaultPortfolioData = {
     "headlineStart": "Hi, I'm ",
     "headlineAccent": "Keerthan Tunkoju",
     "headlineEnd": ".",
-    "heroDescription": "Computer Science graduate specializing in Artificial Intelligence & Machine Learning and practicing GIS Engineer at NeoGeoInfo Technologies. Experienced in deep learning computer vision, predictive ML pipelines, spatial data engineering, and modern web applications.",
-    "aboutLead": "AI/ML-focused Computer Science graduate & practicing GIS Engineer with a passion for software engineering.",
+    "heroDescription": "Computer Science graduate specializing in Artificial Intelligence & Machine Learning and Experienced in deep learning computer vision, predictive ML pipelines, spatial data engineering, and modern web applications.",
+    "aboutLead": "AI/ML-focused Computer Science graduate with a passion for software engineering.",
     "aboutP1": "I graduated with a B.Tech in Computer Science & Engineering (Artificial Intelligence & Machine Learning) from Sri Indu Institute of Engineering & Technology. My academic journey provided rigorous training in Machine Learning, Deep Learning, Data Structures & Algorithms, and Database Management Systems.",
-    "aboutP2": "Currently, I work as a GIS Engineer at NeoGeoInfo Technologies Ltd., where I deliver production-ready urban GIS databases for the Greater Hyderabad Municipal Corporation (GHMC). I specialize in spatial data digitization, topology validation, and attribute QA/QC across roads, electric networks, drainage, water bodies, and civic infrastructure using ArcGIS, QGIS, Google Earth, and Global Mapper.",
-    "aboutP3": "In addition to spatial engineering, I have delivered end-to-end Machine Learning solutions—including deep learning CNNs for brain tumor medical imaging and supervised agricultural crop yield prediction models—and built responsive web applications during industry internships with Bharat Intern, CodSoft, and Intrainz.",
+    "aboutP2": "I have delivered end-to-end Machine Learning solutions—including deep learning CNNs for brain tumor medical imaging and supervised agricultural crop yield prediction models—and built responsive web applications during industry internships with Bharat Intern, CodSoft, and Intrainz.",
     "stats": [
       {
         "number": "AI & ML",
@@ -193,8 +192,8 @@ const defaultPortfolioData = {
       "org": "Intrainz",
       "year": "2023",
       "desc": "Industrial training in full-stack frontend development, HTML5, CSS3, JavaScript, and responsive website architecture.",
-      "credentialUrl": "./Assets/certifications/internship_certificate_keerthan_tunkoju-1790667168838.pdf",
-      "fileUrl": "./Assets/certifications/internship_certificate_keerthan_tunkoju-1790667168838.pdf"
+      "credentialUrl": "",
+      "fileUrl": "./Assets/certifications/internship_certificate__keerthan_tunkoju-1790667168838.pdf"
     },
     {
       "id": "cert-2",
