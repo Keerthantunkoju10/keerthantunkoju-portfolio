@@ -188,11 +188,12 @@
             </div>
             <pre class="window-body"><code id="code-card-body"><span class="code-keyword">class</span> <span class="code-var">Developer</span>:
     name = <span class="code-string">"Keerthan Tunkoju"</span>
-    role = <span class="code-string">"Software Developer | AI &amp; ML"</span>
+    degree = <span class="code-string">"B.Tech CSE (AI &amp; ML)"</span>
+    current_role = <span class="code-string">"GIS Engineer @ NeoGeoInfo"</span>
     core_languages = [<span class="code-string">"Python"</span>, <span class="code-string">"HTML"</span>, <span class="code-string">"JavaScript"</span>, <span class="code-string">"SQL"</span>]
     focus_areas = [
         <span class="code-string">"Deep Learning &amp; CNNs"</span>,
-        <span class="code-string">"Supervised Learning"</span>,
+        <span class="code-string">"Spatial Digitization &amp; GIS"</span>,
         <span class="code-string">"Responsive Web Systems"</span>
     ]
     location = <span class="code-string">"Hyderabad, India"</span>
@@ -264,14 +265,14 @@
       </div>
     </section>
 
-    <!-- Internship Experience Section -->
+    <!-- Professional Experience Section -->
     <section id="experience" class="section experience-section" aria-labelledby="experience-heading">
       <div class="container">
         <header class="section-header">
-          <span class="section-subtitle">Internship Journey</span>
-          <h2 id="experience-heading" class="section-title">Internship Experience</h2>
+          <span class="section-subtitle">Career Journey</span>
+          <h2 id="experience-heading" class="section-title">Work &amp; Internship Experience</h2>
           <div class="title-underline"></div>
-          <p class="section-intro">Practical industry internship experience spanning Python software development and frontend web engineering.</p>
+          <p class="section-intro">Practical industry experience spanning spatial engineering, software scripting, and web development.</p>
         </header>
 
         <div class="timeline-container" id="timeline-container">
@@ -287,7 +288,7 @@
           <span class="section-subtitle">Technical Toolkit</span>
           <h2 id="skills-heading" class="section-title">Technical Skills</h2>
           <div class="title-underline"></div>
-          <p class="section-intro">Technologies, tools, and methodologies leveraged across software, AI, and modern web applications.</p>
+          <p class="section-intro">Technologies, tools, and methodologies leveraged across software, AI, and spatial engineering projects.</p>
         </header>
 
         <div class="skills-categories-grid" id="skills-container">
@@ -303,7 +304,7 @@
           <span class="section-subtitle">Portfolio Showcase</span>
           <h2 id="projects-heading" class="section-title">Academic &amp; Engineering Projects</h2>
           <div class="title-underline"></div>
-          <p class="section-intro">Demonstrating practical applications of Deep Learning, Machine Learning, and Full-Stack Web Development.</p>
+          <p class="section-intro">Demonstrating practical applications of Deep Learning, Machine Learning, GIS Spatial Engineering, and Full-Stack Web Development.</p>
         </header>
 
         <div class="projects-grid" id="projects-container">
@@ -350,10 +351,9 @@
             </address>
           </div>
 
+          <!-- Interactive Contact Form -->
           <div class="contact-form-card">
-            <form id="contact-form" class="contact-form" name="contact" method="POST" data-netlify="true" netlify-honeypot="bot-field" novalidate>
-              <input type="hidden" name="form-name" value="contact">
-              <p style="display:none;" aria-hidden="true"><label>Leave blank: <input name="bot-field"></label></p>
+            <form id="contact-form" class="contact-form" novalidate>
               <div id="form-alert" class="form-alert" role="alert" aria-live="polite" hidden></div>
 
               <div class="form-group">
@@ -438,6 +438,8 @@
       <div class="footer-bottom">
         <p class="copyright-text">
           &copy; <span id="current-year">2026</span> <span id="footer-copy-name">Keerthan Tunkoju</span>. All rights reserved.
+          <span class="footer-admin-dot">&bull;</span>
+          <button type="button" class="footer-admin-link" id="footer-admin-btn" title="Admin CMS Portal">🔒 Admin Login</button>
         </p>
         <a href="#hero" class="back-to-top" aria-label="Scroll back to top of page">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -520,8 +522,8 @@
         <button class="cms-tab-btn" data-tab="tab-projects">Projects</button>
         <button class="cms-tab-btn" data-tab="tab-skills">Skills</button>
         <button class="cms-tab-btn" data-tab="tab-certifications">Certifications (<span id="cms-cert-count">0</span>)</button>
-        <button class="cms-tab-btn" data-tab="tab-messages">📬 Inbox (<span id="msg-badge-count">0</span>)</button>
-        <button class="cms-tab-btn" data-tab="tab-mail-settings">✉️ Mail Integration</button>
+        <button class="cms-tab-btn" data-tab="tab-messages">📬 Central Inbox (<span id="msg-badge-count">0</span>)</button>
+        <button class="cms-tab-btn" data-tab="tab-email-settings">📧 Google App Password &amp; Mail</button>
         <button class="cms-tab-btn" data-tab="tab-database">🗄️ Database</button>
         <button class="cms-tab-btn" data-tab="tab-backup">Data &amp; Backup</button>
         <button class="cms-tab-btn" data-tab="tab-security">Security</button>
@@ -796,197 +798,144 @@
           </form>
         </div>
 
-        <!-- Tab 7: Contact Messages Inbox (Stored in Database) -->
+        <!-- Tab 6: Centralized Contact Messages Inbox (Stored in SQLite Database) -->
         <div id="tab-messages" class="cms-tab-pane">
-          <div class="cms-pane-header">
-            <div>
-              <h4 class="backup-title">📬 Inquiries Mailbox &amp; Database</h4>
-              <p class="cms-pane-desc">Messages submitted by recruiters &amp; visitors, stored in SQLite database with automated email dispatch.</p>
+          <div class="inbox-dashboard-header">
+            <div class="inbox-header-titles">
+              <div class="inbox-badges-row">
+                <span class="inbox-chip chip-db">🗄️ SQLite Central DB: Active</span>
+                <span class="inbox-chip chip-email" id="inbox-email-status-chip">✉️ Gmail Alerts: Checking...</span>
+              </div>
+              <h4 class="backup-title">Centralized Inquiries Inbox</h4>
+              <p class="cms-pane-desc">Messages submitted across all devices, synchronized in real-time in <code>portfolio.db</code>.</p>
             </div>
-            <div class="inbox-head-actions">
-              <button class="btn btn-sm btn-secondary" id="refresh-messages-btn" title="Reload messages from database">🔄 Refresh Inbox</button>
-              <button class="btn btn-sm btn-outline" id="inbox-goto-settings-btn" type="button" title="Configure Mail Server &amp; Alerts">⚙️ Mail Settings</button>
-            </div>
-          </div>
-
-          <!-- Inbox Metrics Bar -->
-          <div class="inbox-metrics-bar">
-            <div class="inbox-metric-card">
-              <span class="inbox-metric-num" id="inbox-metric-total">0</span>
-              <span class="inbox-metric-lbl">Total Inquiries</span>
-            </div>
-            <div class="inbox-metric-card">
-              <span class="inbox-metric-num text-info" id="inbox-metric-unread">0</span>
-              <span class="inbox-metric-lbl">Unread Messages</span>
-            </div>
-            <div class="inbox-metric-card">
-              <span class="inbox-metric-num text-success" id="inbox-metric-replied">0</span>
-              <span class="inbox-metric-lbl">Replied Inquiries</span>
-            </div>
-            <div class="inbox-metric-card inbox-metric-status">
-              <span class="inbox-metric-val" id="inbox-metric-mailstatus">Checking...</span>
-              <span class="inbox-metric-lbl">Mail Server Status</span>
+            <div class="inbox-header-actions">
+              <button class="btn btn-sm btn-outline" id="mark-all-read-btn">✓ Mark All as Read</button>
+              <button class="btn btn-sm btn-secondary" id="refresh-messages-btn">🔄 Refresh Inbox</button>
             </div>
           </div>
 
-          <!-- Inbox Filters & Search Toolbar -->
+          <!-- Inbox Filter & Search Toolbar -->
           <div class="inbox-toolbar">
-            <div class="inbox-filters">
-              <button type="button" class="inbox-filter-pill active" data-filter="all">All Inquiries</button>
-              <button type="button" class="inbox-filter-pill" data-filter="unread">Unread <span class="filter-count-badge" id="filter-unread-count">0</span></button>
-              <button type="button" class="inbox-filter-pill" data-filter="replied">Replied</button>
-            </div>
             <div class="inbox-search-box">
-              <input type="search" id="inbox-search-input" class="form-input form-input-sm" placeholder="🔍 Search by sender, email, subject...">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="inbox-search-input" class="inbox-search-field" placeholder="Search by name, email, or message keyword...">
+            </div>
+            <div class="inbox-filter-pills">
+              <button type="button" class="filter-pill active" data-filter="all">All (<span id="count-all-msgs">0</span>)</button>
+              <button type="button" class="filter-pill" data-filter="unread">Unread (<span id="count-unread-msgs">0</span>)</button>
+              <button type="button" class="filter-pill" data-filter="replied">Replied (<span id="count-replied-msgs">0</span>)</button>
             </div>
           </div>
 
-          <!-- Messages List Container -->
           <div id="messages-list-container" class="messages-list-wrap">
-            <!-- Dynamically populated from database -->
+            <!-- Dynamically populated from SQLite database -->
           </div>
         </div>
 
-        <!-- Tab 7.5: Mail Integration & SMTP Settings -->
-        <div id="tab-mail-settings" class="cms-tab-pane">
+        <!-- Tab 7: Google App Password & Gmail SMTP Settings (Centralized for All Devices) -->
+        <div id="tab-email-settings" class="cms-tab-pane">
           <div class="cms-pane-header">
             <div>
-              <h4 class="backup-title">✉️ Mail Server &amp; Notification Integration</h4>
-              <p class="cms-pane-desc">Configure automated email forwarding for contact inquiries and direct SMTP email replies from the dashboard.</p>
+              <div class="inbox-badges-row">
+                <span class="inbox-chip chip-cloud" id="google-smtp-status-chip">☁️ Google SMTP: Checking...</span>
+                <span class="inbox-chip chip-sync">🔄 Shared Across All Devices</span>
+              </div>
+              <h4 class="backup-title">Google App Password &amp; Email Delivery</h4>
+              <p class="cms-pane-desc">Configure your Google App Password once here. It is saved in the central SQLite database so all devices and visitors automatically forward email inquiries to your inbox.</p>
             </div>
-            <button class="btn btn-sm btn-outline" id="mail-settings-back-inbox-btn">📬 Go to Inbox</button>
           </div>
 
-          <!-- Live Mail Health Status Card -->
-          <div class="mail-health-card" id="mail-health-card">
-            <div class="mail-health-indicator">
-              <span class="status-pulse-dot" id="mail-health-dot"></span>
+          <!-- How to get Google App Password Guide Card -->
+          <div class="email-guide-card">
+            <div class="guide-card-header">
+              <div class="guide-card-icon">🔑</div>
               <div>
-                <strong class="mail-health-title" id="mail-health-title">Connecting to Mail Engine...</strong>
-                <p class="mail-health-desc" id="mail-health-desc">Verifying SMTP configuration and notification dispatch service.</p>
+                <strong>How to generate a 16-character Google App Password (in 60 seconds):</strong>
+                <p>Google App Passwords allow your portfolio server to securely send instant email notifications via your Gmail account without exposing your main password.</p>
               </div>
             </div>
-            <div class="mail-health-tag" id="mail-health-tag">Checking</div>
+            <ol class="guide-steps-list">
+              <li>Turn ON <strong>2-Step Verification</strong> on your Google Account: <a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener noreferrer">myaccount.google.com/signinoptions/two-step-verification ↗</a></li>
+              <li>Go to the Google App Passwords page: <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer"><strong>myaccount.google.com/apppasswords ↗</strong></a></li>
+              <li>Enter App Name as <code>Portfolio Website</code> and click <strong>Create</strong>.</li>
+              <li>Copy the <strong>16-character code</strong> (e.g. <code>abcd efgh ijkl mnop</code>) and paste it into the password box below. Spaces are automatically removed!</li>
+            </ol>
           </div>
 
-          <form id="cms-mail-settings-form" class="mail-settings-form">
-            <!-- Section 1: Inbound Notifications -->
-            <div class="mail-config-section">
-              <div class="mail-sec-header">
-                <span class="mail-sec-icon">📩</span>
-                <div>
-                  <h5 class="mail-sec-title">Inbound Inquiry Alerts (Forwarding)</h5>
-                  <p class="mail-sec-desc">Receive immediate email notifications whenever a recruiter or visitor contacts you.</p>
-                </div>
-              </div>
-
-              <div class="form-group checkbox-group" style="margin-bottom: 1.25rem;">
-                <label class="custom-checkbox-label">
-                  <input type="checkbox" id="mail-setting-notify-enabled" checked>
-                  <span class="checkbox-box"></span>
-                  <span class="checkbox-text"><strong>Enable Instant Email Alerts:</strong> Dispatch an email alert to my personal inbox as soon as a message arrives.</span>
-                </label>
-              </div>
-
+          <form id="email-settings-form" class="email-settings-form-grid">
+            <div class="form-row">
               <div class="form-group">
-                <label for="mail-setting-notify-email" class="form-label">Alert Recipient Email (Keerthan's Email) <span class="required">*</span></label>
-                <input type="email" id="mail-setting-notify-email" class="form-input" value="keerthantunkoju10@gmail.com" required placeholder="keerthantunkoju10@gmail.com">
-                <span class="form-help">All inquiries submitted through your portfolio contact form will be forwarded here.</span>
-              </div>
-            </div>
-
-            <!-- Section 2: Outbound Mail Delivery (SMTP) -->
-            <div class="mail-config-section">
-              <div class="mail-sec-header">
-                <span class="mail-sec-icon">🚀</span>
-                <div>
-                  <h5 class="mail-sec-title">Outbound Email Engine (SMTP Configuration)</h5>
-                  <p class="mail-sec-desc">Allows you to send replies directly from this CMS dashboard to recruiters.</p>
-                </div>
-              </div>
-
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label for="mail-setting-provider" class="form-label">Mail Provider / Preset</label>
-                  <select id="mail-setting-provider" class="form-select">
-                    <option value="gmail" selected>Google Gmail (smtp.gmail.com)</option>
-                    <option value="smtp">Custom SMTP Server</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label for="mail-setting-from-name" class="form-label">Sender Display Name</label>
-                  <input type="text" id="mail-setting-from-name" class="form-input" value="Keerthan Tunkoju Portfolio" placeholder="Keerthan Tunkoju Portfolio">
-                </div>
-              </div>
-
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label for="mail-setting-host" class="form-label">SMTP Host</label>
-                  <input type="text" id="mail-setting-host" class="form-input" value="smtp.gmail.com" placeholder="smtp.gmail.com">
-                </div>
-
-                <div class="form-group">
-                  <label for="mail-setting-port" class="form-label">SMTP Port</label>
-                  <input type="number" id="mail-setting-port" class="form-input" value="465" placeholder="465">
-                </div>
-              </div>
-
-              <div class="form-group checkbox-group" style="margin-bottom: 1.25rem;">
-                <label class="custom-checkbox-label">
-                  <input type="checkbox" id="mail-setting-secure" checked>
-                  <span class="checkbox-box"></span>
-                  <span class="checkbox-text">Use SSL / Secure Connection (Port 465 SSL or Port 587 STARTTLS)</span>
+                <label for="cfg-gmail-user" class="form-label">
+                  <span>Your Gmail Address</span>
+                  <span class="field-hint">(Used to send email via Gmail SMTP)</span>
                 </label>
-              </div>
-
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label for="mail-setting-user" class="form-label">SMTP Username / Email <span class="required">*</span></label>
-                  <input type="email" id="mail-setting-user" class="form-input" value="keerthantunkoju10@gmail.com" placeholder="keerthantunkoju10@gmail.com">
-                </div>
-
-                <div class="form-group">
-                  <label for="mail-setting-pass" class="form-label">SMTP Password / Gmail App Password</label>
-                  <div class="input-with-action">
-                    <input type="password" id="mail-setting-pass" class="form-input" placeholder="Enter 16-character App Password">
-                    <button type="button" class="btn btn-sm btn-outline input-action-btn" id="toggle-mail-pass-btn">👁️</button>
-                  </div>
-                  <span class="form-help">
-                    💡 <strong>Gmail tip:</strong> Use a 16-character <em>App Password</em> from your Google Account (Security &gt; 2-Step Verification &gt; App Passwords).
-                  </span>
+                <div class="input-icon-wrap">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                  <input type="email" id="cfg-gmail-user" class="form-input with-icon" placeholder="e.g. keerthantunkoju@gmail.com" required>
                 </div>
               </div>
 
               <div class="form-group">
-                <label for="mail-setting-from-email" class="form-label">From / Reply-To Email Address</label>
-                <input type="email" id="mail-setting-from-email" class="form-input" value="keerthantunkoju10@gmail.com" placeholder="keerthantunkoju10@gmail.com">
+                <label for="cfg-app-password" class="form-label">
+                  <span>Google App Password (16 characters)</span>
+                  <span class="field-hint" id="cfg-app-pass-status">(Stored in SQLite)</span>
+                </label>
+                <div class="input-icon-wrap input-password-wrap">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                  <input type="password" id="cfg-app-password" class="form-input with-icon" placeholder="Paste 16-character Google App Password" autocomplete="off">
+                  <button type="button" class="btn-toggle-eye" id="toggle-app-password-btn" title="Toggle password visibility">👁️</button>
+                </div>
               </div>
             </div>
 
-            <!-- Section 3: Diagnostic Test & Save -->
-            <div class="mail-config-section">
-              <div class="mail-sec-header">
-                <span class="mail-sec-icon">🧪</span>
-                <div>
-                  <h5 class="mail-sec-title">Verify Connection &amp; Save</h5>
-                  <p class="mail-sec-desc">Test email delivery to ensure your SMTP credentials and notifications work 100%.</p>
-                </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfg-notify-email" class="form-label">
+                  <span>Forward Notifications To</span>
+                  <span class="field-hint">(Where visitor inquiries should arrive)</span>
+                </label>
+                <input type="email" id="cfg-notify-email" class="form-input" placeholder="e.g. keerthantunkoju@gmail.com">
               </div>
 
-              <div class="mail-actions-row">
-                <div class="test-mail-input-wrap">
-                  <input type="email" id="mail-test-target" class="form-input form-input-sm" placeholder="Test recipient email" value="keerthantunkoju10@gmail.com">
-                  <button type="button" class="btn btn-sm btn-secondary" id="btn-test-mail-dispatch">
-                    <span id="btn-test-mail-text">🧪 Send Test Email</span>
-                  </button>
-                </div>
-                <button type="submit" class="btn btn-sm btn-primary" id="btn-save-mail-settings">
-                  <span>💾 Save Mail Configuration</span>
-                </button>
+              <div class="form-group">
+                <label for="cfg-sender-name" class="form-label">
+                  <span>Sender Display Name</span>
+                  <span class="field-hint">(Shown in email sender line)</span>
+                </label>
+                <input type="text" id="cfg-sender-name" class="form-input" placeholder="e.g. Keerthan Tunkoju Portfolio">
               </div>
+            </div>
 
-              <div id="mail-test-feedback" class="mail-feedback-box" hidden></div>
+            <div class="checkbox-group-card">
+              <label class="custom-checkbox-row">
+                <input type="checkbox" id="cfg-email-notifications-enabled" checked>
+                <span class="checkbox-box"></span>
+                <span class="checkbox-label-text">
+                  <strong>Instant Email Alerts</strong>
+                  <span class="checkbox-desc">Receive immediate email notification whenever a visitor submits the contact form.</span>
+                </span>
+              </label>
+
+              <label class="custom-checkbox-row">
+                <input type="checkbox" id="cfg-auto-reply-enabled">
+                <span class="checkbox-box"></span>
+                <span class="checkbox-label-text">
+                  <strong>Automatic Confirmation to Visitor</strong>
+                  <span class="checkbox-desc">Send an instant receipt thank-you email to the visitor confirming their message was delivered.</span>
+                </span>
+              </label>
+            </div>
+
+            <div id="email-settings-feedback" class="form-alert" hidden></div>
+
+            <div class="email-settings-btn-group">
+              <button type="submit" class="btn btn-primary" id="save-email-settings-btn">
+                <span>💾 Save Email Settings for All Devices</span>
+              </button>
+              <button type="button" class="btn btn-secondary" id="test-email-settings-btn">
+                <span>🧪 Test Connection &amp; Send Test Email</span>
+              </button>
             </div>
           </form>
         </div>
@@ -1287,110 +1236,6 @@
 
       <div class="modal-body cert-preview-body" id="cert-preview-body">
         <!-- Dynamically rendered certificate content -->
-      </div>
-    </div>
-  </div>
-
-  <!-- 7. Interactive Mail Composer & Reply Modal -->
-  <div id="cms-mail-composer-modal" class="modal-backdrop modal-lg" hidden>
-    <div class="modal-card mail-composer-card">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <svg class="modal-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-          <div>
-            <h3 class="modal-title" id="mail-composer-title">Compose Email Reply</h3>
-            <span class="cert-preview-subtitle" id="mail-composer-subtitle">Replying to inquiry</span>
-          </div>
-        </div>
-        <button class="modal-close-btn" data-close-modal title="Close">&times;</button>
-      </div>
-
-      <div class="modal-body mail-composer-body">
-        <form id="cms-mail-reply-form">
-          <input type="hidden" id="reply-msg-id" value="">
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="reply-to-email" class="form-label">To (Recipient Email) <span class="required">*</span></label>
-              <div class="input-with-action">
-                <input type="email" id="reply-to-email" class="form-input" required placeholder="recipient@example.com">
-                <button type="button" class="btn btn-sm btn-outline input-action-btn" id="reply-copy-email-btn" title="Copy recipient email">📋</button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="reply-subject" class="form-label">Subject Line <span class="required">*</span></label>
-              <input type="text" id="reply-subject" class="form-input" required placeholder="Re: Portfolio Inquiry">
-            </div>
-          </div>
-
-          <!-- Quick Response Template Picker -->
-          <div class="form-group">
-            <label for="reply-template-picker" class="form-label">Quick Response Templates</label>
-            <select id="reply-template-picker" class="form-select">
-              <option value="">✨ Select a Professional Response Template...</option>
-              <option value="gratitude">💼 1. Gratitude &amp; General Follow-Up</option>
-              <option value="interview">📅 2. Schedule Technical Interview / Discussion</option>
-              <option value="collaboration">🚀 3. Project Collaboration &amp; Scope Discussion</option>
-              <option value="resume">📄 4. Resume, Credentials &amp; Portfolio Verification</option>
-              <option value="clear">🧹 5. Clear / Custom Message</option>
-            </select>
-          </div>
-
-          <!-- Message Body Textarea -->
-          <div class="form-group">
-            <div class="form-label-row">
-              <label for="reply-body-text" class="form-label">Reply Message <span class="required">*</span></label>
-              <span class="char-count" id="reply-char-count">0 characters</span>
-            </div>
-            <textarea id="reply-body-text" class="form-textarea" rows="8" required placeholder="Type your response to the inquiry here..."></textarea>
-          </div>
-
-          <!-- Original Message Accordion Preview -->
-          <div class="original-inquiry-box">
-            <div class="original-inquiry-header" id="toggle-original-inquiry">
-              <span>📄 Original Inquiry from <strong id="reply-orig-name">Visitor</strong></span>
-              <span class="accordion-arrow" id="reply-accordion-arrow">▼</span>
-            </div>
-            <div class="original-inquiry-content" id="reply-orig-content">
-              <div class="orig-msg-meta">
-                <span id="reply-orig-date"></span> &bull; Subject: <span id="reply-orig-subject"></span>
-              </div>
-              <div class="orig-msg-text" id="reply-orig-body"></div>
-            </div>
-          </div>
-
-          <!-- Delivery Actions Bar -->
-          <div class="mail-composer-actions">
-            <div class="mail-primary-actions">
-              <button type="submit" class="btn btn-primary" id="reply-send-smtp-btn">
-                <span id="reply-send-smtp-text">🚀 Send via Server (SMTP)</span>
-              </button>
-              <button type="button" class="btn btn-outline" id="reply-mark-only-btn" title="Mark this message as replied without sending server email">
-                <span>✓ Mark as Replied</span>
-              </button>
-            </div>
-
-            <div class="mail-webmail-actions">
-              <span class="webmail-label">1-Click Webmail:</span>
-              <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" id="reply-gmail-web-btn" title="Open formatted draft in Gmail Web">
-                <span>🌐 Gmail</span>
-              </a>
-              <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" id="reply-outlook-web-btn" title="Open formatted draft in Outlook Web">
-                <span>📨 Outlook</span>
-              </a>
-              <a href="#" class="btn btn-sm btn-outline" id="reply-default-mail-btn" title="Open in default mail client (mailto)">
-                <span>✉️ Mailto</span>
-              </a>
-              <button type="button" class="btn btn-sm btn-outline" id="reply-copy-draft-btn" title="Copy response message to clipboard">
-                <span>📋 Copy</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Dynamic Status Banner -->
-          <div id="reply-status-banner" class="mail-feedback-box" hidden></div>
-        </form>
       </div>
     </div>
   </div>

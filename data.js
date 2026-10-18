@@ -193,8 +193,8 @@ const defaultPortfolioData = {
       "org": "Intrainz",
       "year": "2023",
       "desc": "Industrial training in full-stack frontend development, HTML5, CSS3, JavaScript, and responsive website architecture.",
-      "credentialUrl": "",
-      "fileUrl": ""
+      "credentialUrl": "./Assets/certifications/internship_certificate_keerthan_tunkoju-1790667168838.pdf",
+      "fileUrl": "./Assets/certifications/internship_certificate_keerthan_tunkoju-1790667168838.pdf"
     },
     {
       "id": "cert-2",
@@ -202,8 +202,8 @@ const defaultPortfolioData = {
       "org": "CodSoft",
       "year": "2023",
       "desc": "Practical software engineering internship building algorithmic solutions, desktop GUI utilities, and security tools in Python.",
-      "credentialUrl": "",
-      "fileUrl": ""
+      "credentialUrl": "./Assets/certifications/keerthan_tunkoju-1790667256921.pdf",
+      "fileUrl": "./Assets/certifications/keerthan_tunkoju-1790667256921.pdf"
     }
   ]
 };

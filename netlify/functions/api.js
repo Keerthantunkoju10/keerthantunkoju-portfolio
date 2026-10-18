@@ -38,21 +38,28 @@ let memoryStore = {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: Number(process.env.SMTP_PORT) || 465,
     secure: true,
-    auth_user: process.env.SMTP_USER || 'keerthantunkoju10@gmail.com',
-    auth_pass: process.env.SMTP_PASS || '',
+    auth_user: process.env.GMAIL_USER || process.env.SMTP_USER || 'keerthantunkoju10@gmail.com',
+    auth_pass: process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || 'ioml bqxd vtkw kfni',
     from_name: process.env.MAIL_FROM_NAME || 'Keerthan Tunkoju Portfolio',
     from_email: process.env.MAIL_FROM_EMAIL || 'keerthantunkoju10@gmail.com',
     notify_email: process.env.NOTIFY_EMAIL || 'keerthantunkoju10@gmail.com',
-    notify_enabled: true
+    notify_enabled: true,
+    auto_reply_enabled: false
   }
+};
+
+const normalizeAppPassword = (pass) => {
+  if (!pass) return '';
+  return pass.toString().replace(/[\s-]/g, '').trim();
 };
 
 const DEFAULT_HASH = 'ae0d4efe0967ec0418278cd1773114afc8c546489c092e6ccfe99216eb0ef4a4'; // Keerthan@2024
 
 const getTransporter = (settings) => {
-  const user = settings.auth_user || process.env.SMTP_USER;
-  const pass = settings.auth_pass || process.env.SMTP_PASS;
+  const user = settings.auth_user || process.env.GMAIL_USER || process.env.SMTP_USER;
+  let pass = settings.auth_pass || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
   if (!user || !pass) return null;
+  pass = normalizeAppPassword(pass);
 
   const host = settings.host || process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = Number(settings.port) || Number(process.env.SMTP_PORT) || 465;
@@ -60,7 +67,7 @@ const getTransporter = (settings) => {
   if (host.toLowerCase().includes('gmail')) {
     return nodemailer.createTransport({
       service: 'gmail',
-      auth: { user: user.trim(), pass: pass.trim() }
+      auth: { user: user.trim(), pass: pass }
     });
   }
 
@@ -68,7 +75,7 @@ const getTransporter = (settings) => {
     host: host.trim(),
     port: port,
     secure: port === 465,
-    auth: { user: user.trim(), pass: pass.trim() },
+    auth: { user: user.trim(), pass: pass },
     tls: { rejectUnauthorized: false }
   });
 };
@@ -207,6 +214,21 @@ exports.handler = async (event, context) => {
     return sendJson(200, memoryStore.messages);
   }
 
+  // Mark all messages as read
+  if (cleanPath === '/messages/mark-all-read' && method === 'POST') {
+    memoryStore.messages.forEach(m => { m.is_read = 1; });
+    return sendJson(200, { success: true, message: 'All messages marked as read' });
+  }
+
+  // Mark single message as read
+  const readMatch = cleanPath.match(/^\/messages\/(\d+)\/read$/);
+  if (readMatch && (method === 'POST' || method === 'PATCH')) {
+    const id = readMatch[1];
+    const msg = memoryStore.messages.find(m => String(m.id) === String(id));
+    if (msg) msg.is_read = 1;
+    return sendJson(200, { success: true, id });
+  }
+
   // Status update
   const statusMatch = cleanPath.match(/^\/messages\/(\d+)\/status$/);
   if (statusMatch && (method === 'PATCH' || method === 'POST')) {
@@ -244,8 +266,8 @@ exports.handler = async (event, context) => {
     return sendJson(200, { success: true, deletedId: id });
   }
 
-  // 4. API: Mail Settings
-  if (cleanPath === '/mail/settings') {
+  // 4. API: Mail Settings & Google App Password (handles both /settings/email and /mail/settings)
+  if (cleanPath === '/settings/email' || cleanPath === '/mail/settings') {
     if (method === 'GET') {
       const s = memoryStore.mailSettings;
       return sendJson(200, {
@@ -253,50 +275,72 @@ exports.handler = async (event, context) => {
         host: s.host || 'smtp.gmail.com',
         port: s.port || 465,
         secure: Boolean(s.secure),
+        gmailUser: s.auth_user || '',
         auth_user: s.auth_user || '',
-        hasPassword: Boolean(s.auth_pass && s.auth_pass.length > 0),
-        auth_pass: s.auth_pass ? '••••••••' : '',
-        from_name: s.from_name || 'Keerthan Tunkoju Portfolio',
-        from_email: s.from_email || 'keerthantunkoju10@gmail.com',
+        notifyEmail: s.notify_email || 'keerthantunkoju10@gmail.com',
         notify_email: s.notify_email || 'keerthantunkoju10@gmail.com',
-        notify_enabled: Boolean(s.notify_enabled)
+        senderName: s.from_name || 'Keerthan Tunkoju Portfolio',
+        from_name: s.from_name || 'Keerthan Tunkoju Portfolio',
+        emailNotificationsEnabled: Boolean(s.notify_enabled),
+        notify_enabled: Boolean(s.notify_enabled),
+        autoReplyEnabled: Boolean(s.auto_reply_enabled),
+        hasPassword: Boolean(s.auth_pass && s.auth_pass.length > 0),
+        maskedPassword: s.auth_pass ? 'ioml bqxd vtkw kfni' : 'ioml bqxd vtkw kfni'
       });
     }
     if (method === 'POST') {
-      if (body.auth_pass && body.auth_pass !== '••••••••') {
-        memoryStore.mailSettings.auth_pass = body.auth_pass;
+      const gmailUser = body.gmailUser || body.auth_user;
+      const appPassword = body.appPassword || body.auth_pass;
+      if (gmailUser) memoryStore.mailSettings.auth_user = gmailUser.trim();
+      if (appPassword && appPassword.trim().length > 0 && !appPassword.includes('••••')) {
+        memoryStore.mailSettings.auth_pass = normalizeAppPassword(appPassword);
       }
-      if (body.auth_user) memoryStore.mailSettings.auth_user = body.auth_user;
-      if (body.host) memoryStore.mailSettings.host = body.host;
-      if (body.port) memoryStore.mailSettings.port = body.port;
-      if (body.notify_email) memoryStore.mailSettings.notify_email = body.notify_email;
-      if (body.from_name) memoryStore.mailSettings.from_name = body.from_name;
-      if (body.notify_enabled !== undefined) memoryStore.mailSettings.notify_enabled = body.notify_enabled;
-      return sendJson(200, { success: true, message: 'Mail settings saved in function memory' });
+      if (body.notifyEmail || body.notify_email) memoryStore.mailSettings.notify_email = (body.notifyEmail || body.notify_email).trim();
+      if (body.senderName || body.from_name) memoryStore.mailSettings.from_name = (body.senderName || body.from_name).trim();
+      if (body.emailNotificationsEnabled !== undefined) memoryStore.mailSettings.notify_enabled = Boolean(body.emailNotificationsEnabled);
+      if (body.notify_enabled !== undefined) memoryStore.mailSettings.notify_enabled = Boolean(body.notify_enabled);
+      if (body.autoReplyEnabled !== undefined) memoryStore.mailSettings.auto_reply_enabled = Boolean(body.autoReplyEnabled);
+
+      return sendJson(200, {
+        success: true,
+        message: 'Google App Password & email settings successfully saved in function memory'
+      });
     }
   }
 
-  // 5. API: Mail Test
-  if (cleanPath === '/mail/test' && method === 'POST') {
+  // 5. API: Mail Test (handles both /settings/email/test and /mail/test)
+  if ((cleanPath === '/settings/email/test' || cleanPath === '/mail/test') && method === 'POST') {
     try {
-      const target = body.targetEmail || memoryStore.mailSettings.notify_email || 'keerthantunkoju10@gmail.com';
-      const testSettings = { ...memoryStore.mailSettings };
-      if (body.auth_pass && body.auth_pass !== '••••••••') testSettings.auth_pass = body.auth_pass;
-      if (body.auth_user) testSettings.auth_user = body.auth_user;
+      const gmailUser = (body.gmailUser || body.auth_user || memoryStore.mailSettings.auth_user || '').trim();
+      let appPass = body.appPassword || body.auth_pass;
+      if (appPass && !appPass.includes('••••')) {
+        appPass = normalizeAppPassword(appPass);
+      } else {
+        appPass = memoryStore.mailSettings.auth_pass;
+      }
+      const target = body.testEmail || body.targetEmail || memoryStore.mailSettings.notify_email || gmailUser || 'keerthantunkoju10@gmail.com';
 
+      const testSettings = {
+        ...memoryStore.mailSettings,
+        auth_user: gmailUser,
+        auth_pass: appPass
+      };
       const transporter = getTransporter(testSettings);
       if (!transporter) {
-        return sendJson(400, { error: 'SMTP credentials missing. Please set SMTP username and password.' });
+        return sendJson(400, { error: 'Please provide both your Gmail address and 16-character Google App Password.' });
       }
 
       await transporter.sendMail({
-        from: `"${testSettings.from_name}" <${testSettings.auth_user}>`,
+        from: `"${testSettings.from_name || 'Portfolio System'}" <${gmailUser}>`,
         to: target,
         subject: `✅ Keerthan Portfolio: Netlify Mail Test Verified`,
-        text: `Netlify mail integration verification successful at ${new Date().toLocaleString()}.`
+        text: `Netlify mail integration verification successful at ${new Date().toLocaleString()}. Check your inbox.`
       });
 
-      return sendJson(200, { success: true, message: `Test email sent to ${target}` });
+      return sendJson(200, {
+        success: true,
+        message: `Test email successfully sent to ${target}! Check your inbox.`
+      });
     } catch (err) {
       return sendJson(400, { error: 'SMTP Test Failed: ' + err.message });
     }

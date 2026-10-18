@@ -26,27 +26,79 @@ The website includes a persistent **SQLite 3** database (`portfolio.db`) managed
 | Table Name | Description |
 | :--- | :--- |
 | `portfolio_content` | Stores the complete portfolio JSON state (hero, bio, experience, projects, skills, contact info). |
-| `contact_messages` | Stores all incoming inquiries submitted via the contact form (name, email, subject, message, timestamp, status, reply history, and email alert delivery tracking). |
-| `mail_settings` | Stores SMTP credentials, notification preferences, alert destination (`keerthantunkoju10@gmail.com`), and outgoing email presets. |
+| `contact_messages` | Stores all incoming inquiries submitted via the website's contact form across all devices (name, email, subject, message, timestamp, read status, email delivery status, and admin replies). |
+| `system_settings` | Stores centralized configuration across all devices, including the Google App Password (16-char), Gmail user, notification targets, and auto-reply preferences. |
 | `admin_users` | Stores administrator credentials with SHA-256 password hashes. |
 | `activity_logs` | Logs audit events such as portfolio content saves, message submissions, and admin logins. |
 
 ### REST API Endpoints:
 - `GET /api/portfolio` — Fetches current portfolio content from SQLite (with fallback to default data).
 - `POST /api/portfolio` — Saves updated portfolio content directly into SQLite `portfolio_content`.
-- `POST /api/contact` — Persists a visitor's contact inquiry into SQLite `contact_messages` and automatically dispatches an instant email notification to Keerthan.
-- `GET /api/messages` — Retrieves visitor messages for the Admin CMS Inbox.
-- `PATCH /api/messages/:id/status` — Updates read/unread/replied status of an inquiry.
-- `POST /api/messages/:id/reply` — Records an email reply directly in SQLite.
-- `DELETE /api/messages/:id` — Deletes a message by ID from SQLite.
-- `GET /api/mail/settings` — Returns current mail notification and SMTP configuration.
-- `POST /api/mail/settings` — Updates and persists mail configuration to SQLite.
-- `POST /api/mail/test` — Verifies SMTP connection by dispatching a test email.
-- `POST /api/mail/send-reply` — Delivers a direct email reply to a recruiter/visitor via Nodemailer SMTP.
-- `GET /api/database/stats` — Returns real-time database diagnostics (file size, total messages, active tables, engine type).
+- `POST /api/contact` — Persists a visitor's contact inquiry into SQLite `contact_messages` and queues an instant Gmail SMTP notification.
+- `GET /api/messages` — Retrieves visitor messages for the Admin CMS Central Inbox.
+- `POST /api/messages/:id/reply` — Sends an email reply directly to the visitor via Gmail SMTP using the configured Google App Password.
+- `POST /api/messages/:id/read` — Marks an individual inquiry as read or unread.
+- `POST /api/messages/mark-all-read` — Marks all inquiries as read in the database.
+- `DELETE /api/messages/:id` — Deletes a message by ID from SQLite for all devices.
+- `GET /api/settings/email` — Retrieves current email configuration (with Google App Password masked).
+- `POST /api/settings/email` — Saves Google App Password and email settings in SQLite for all devices.
+- `POST /api/settings/email/test` — Verifies Google App Password and Gmail SMTP connectivity with a live test email.
+- `GET /api/database/stats` — Returns real-time database diagnostics (file size, total messages, unread count, Google SMTP status).
 - `POST /api/auth/login` — Verifies administrator credentials against SQLite `admin_users`.
+- `POST /api/auth/change-password` — Updates administrator password hash in SQLite `admin_users` across all devices.
 
-> **Note**: If run without Node.js (e.g. on GitHub Pages or static hosts), the website automatically falls back to browser `localStorage` and provides 1-Click direct Gmail Web and Outlook compose links seamlessly.
+> **Note**: The Google App Password and email settings are stored centrally in SQLite (`portfolio.db`). Once saved via the CMS Dashboard, all devices (mobile, tablet, desktop) and visitors use these central settings automatically.
+
+---
+
+## 🔐 Private Admin Access & Stealth Mode (Only for You)
+
+The website features **Private Stealth Mode**: the Admin button and controls are **completely hidden from public visitors, recruiters, and employers**. Only you can unlock and access the admin dashboard.
+
+### 🚪 Secret Gateways to Access Admin:
+1. **Secret URL Parameter**: Add `?admin` to your website URL (e.g. `https://your-portfolio.netlify.app/?admin`). This unlocks the admin modal and saves your device as authorized.
+2. **Secret Keyboard Shortcut**: Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> on Windows/Linux (or <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> on Mac) anytime on the site.
+3. **Secret Mobile Gesture**: Tap the **`<Keerthan.dev/>`** logo **3 times rapidly** on any mobile phone or browser to trigger the admin login prompt.
+
+| Setting | Value / Details | Notes |
+| :--- | :--- | :--- |
+| **Visibility** | Stealth Mode (Hidden from public) | Only reveals on authorized devices or via secret triggers |
+| **Keyboard Shortcut** | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd> | Opens Admin Login / CMS Dashboard instantly |
+| **Mobile Gesture** | Triple-tap navbar logo | Opens Admin prompt on smartphones & tablets |
+| **Secret URL** | `https://your-domain/?admin` | Unlocks & authorizes your personal browser |
+| **Default Username** | `admin` | Used for server-side verification |
+| **Default Password** | `Keerthan@2024` | Can be changed anytime in the **Security** tab |
+| **Login Timeout** | 20 seconds | Auto-closes and re-locks stealth mode if not logged in |
+| **Security Standard** | Web Crypto API SHA-256 | Cryptographically hashed in the browser |
+
+---
+
+## ✏️ How Online Editing Works
+
+### 1. Live In-Place Visual Editing (Click-to-Edit)
+1. Open the Admin prompt using any of the secret triggers above (<kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>, triple-tapping the logo, or `?admin`).
+2. Enter the password `Keerthan@2024`.
+3. The **Floating Admin Toolbar** will appear across the top.
+4. Toggle **Live Inline Edit** to **ON**.
+5. **Click directly on any text on the website** (Hero title, intro, bio paragraphs, stats, project descriptions, skills, or contact info).
+6. Edit the text naturally. When you click away (`blur`), your edits are automatically saved to SQLite / local storage with a notification toast!
+
+### 2. Full Admin CMS Dashboard
+Click **CMS Dashboard** in the admin toolbar to open the comprehensive management panel:
+- **👤 Profile & Bio**: 
+  - **Upload Profile Photo**: Upload a new portrait photo directly from your device (with drag & drop, client-side auto-optimization, and disk/SQLite persistence), enter a custom photo URL, or revert to the default avatar graphic.
+  - Modify your name, status badge, hero intro, about paragraphs, email, phone, location, LinkedIn, and GitHub links.
+- **💼 Experience Manager**: Add new job roles, edit company names and dates, update bullet points, or delete items.
+- **🚀 Projects Manager**: Add new projects, customize tags, change preview color gradient themes, update GitHub/Demo links, or remove projects.
+- **⚡ Skills Matrix**: Add or delete skills under each of the 4 core categories.
+- **📬 Contact Inbox**: View real-time visitor messages submitted through the contact form, with sender details, timestamps, direct email reply, and deletion.
+- **🗄️ Database Diagnostics**: View live SQLite database stats (`portfolio.db` file size, message count, driver info) and trigger instant database sync.
+- **📦 Data & Backup**:
+  - **Export JSON**: Download a full `portfolio-data.json` backup file.
+  - **Copy JSON**: Copy the entire state directly to your clipboard.
+  - **Import JSON**: Upload a JSON backup file to instantly restore your customizations.
+  - **Reset to Defaults**: One-click restore to Keerthan Tunkoju's verified resume defaults.
+- **🔐 Security**: Change your admin password with current password verification and new SHA-256 hash generation.
 
 ---
 

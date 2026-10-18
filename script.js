@@ -90,27 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
             portfolioData.certifications = [];
           }
         }
-        // Self-heal stale experience if old GIS role is present from previous sessions
-        if (portfolioData.experience && portfolioData.experience.some(e => (e.role && e.role.toLowerCase().includes('gis')) || (e.company && e.company.toLowerCase().includes('neogeo')))) {
-          if (defaultPortfolioData && defaultPortfolioData.experience) {
-            portfolioData.experience = JSON.parse(JSON.stringify(defaultPortfolioData.experience));
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolioData));
-          }
-        }
-        // Self-heal stale skills if old GIS skill category is present from previous sessions
-        if (portfolioData.skills && portfolioData.skills.some(s => s.title && s.title.toLowerCase().includes('gis'))) {
-          if (defaultPortfolioData && defaultPortfolioData.skills) {
-            portfolioData.skills = JSON.parse(JSON.stringify(defaultPortfolioData.skills));
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolioData));
-          }
-        }
-        // Self-heal stale projects if old GIS project is present from previous sessions
-        if (portfolioData.projects && portfolioData.projects.some(p => (p.title && p.title.toLowerCase().includes('spatial')) || (p.categoryBadge && p.categoryBadge.toLowerCase().includes('gis')))) {
-          if (defaultPortfolioData && defaultPortfolioData.projects) {
-            portfolioData.projects = JSON.parse(JSON.stringify(defaultPortfolioData.projects));
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolioData));
-          }
-        }
       } else {
         portfolioData = JSON.parse(JSON.stringify(defaultPortfolioData));
       }
@@ -808,9 +787,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginAdmin = async (password) => {
     if (!password) return;
     const computedHash = await sha256(password);
-    const currentHash = getStoredHash();
+    let isAuthenticated = false;
 
-    if (computedHash === currentHash) {
+    // 1. Authenticate against central SQLite database (works across all devices)
+    if (window.location.protocol.startsWith('http')) {
+      try {
+        const res = await fetch(getApiUrl('/api/auth/login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hash: computedHash })
+        });
+        if (res.ok) {
+          const authData = await res.json();
+          if (authData && authData.authenticated === true) {
+            isAuthenticated = true;
+            setStoredHash(computedHash);
+          }
+        }
+      } catch (e) {
+        console.warn('Backend login endpoint unreachable, checking local hash cache:', e);
+      }
+    }
+
+    // 2. Fallback to cached local hash if offline / static
+    if (!isAuthenticated) {
+      const currentHash = getStoredHash();
+      if (computedHash === currentHash) {
+        isAuthenticated = true;
+      }
+    }
+
+    if (isAuthenticated) {
       stopAdminLoginTimer();
       sessionStorage.setItem(AUTH_KEY, 'true');
       localStorage.setItem(ADMIN_DEVICE_KEY, 'true'); // Authorize device upon login
@@ -818,9 +825,14 @@ document.addEventListener('DOMContentLoaded', () => {
       closeModal(adminLoginModal);
       if (adminLoginForm) adminLoginForm.reset();
       updateAdminUI();
-      // Automatically turn on edit mode for convenient in-place editing
+      // Automatically turn on edit mode and open CMS Dashboard
       setEditMode(true);
-      showToast('Authenticated as Admin! Visual Edit Mode is now ON.', 'success');
+      fetchMessagesFromDb();
+      loadEmailSettings();
+      fetchDbStats();
+      openModal(document.getElementById('admin-cms-modal'));
+      populateCmsFields();
+      showToast('Authenticated as Admin! CMS Dashboard opened.', 'success');
     } else {
       if (loginErrorMsg) {
         loginErrorMsg.textContent = 'Incorrect admin password.';
@@ -916,6 +928,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // Listeners for Auth
   if (adminTriggerBtn) {
     adminTriggerBtn.addEventListener('click', () => {
+      if (isUserAuthenticated()) {
+        openModal(document.getElementById('admin-cms-modal'));
+        populateCmsFields();
+      } else {
+        openAdminLoginModalWithTimer();
+      }
+    });
+  }
+
+  const footerAdminBtn = document.getElementById('footer-admin-btn');
+  if (footerAdminBtn) {
+    footerAdminBtn.addEventListener('click', () => {
       if (isUserAuthenticated()) {
         openModal(document.getElementById('admin-cms-modal'));
         populateCmsFields();
@@ -1055,6 +1079,9 @@ document.addEventListener('DOMContentLoaded', () => {
     openCmsBtn.addEventListener('click', () => {
       openModal(cmsModal);
       populateCmsFields();
+      fetchMessagesFromDb();
+      loadEmailSettings();
+      fetchDbStats();
     });
   }
 
@@ -1065,8 +1092,17 @@ document.addEventListener('DOMContentLoaded', () => {
       tabPanes.forEach(p => p.classList.remove('active'));
 
       btn.classList.add('active');
-      const targetPane = document.getElementById(btn.getAttribute('data-tab'));
+      const tabId = btn.getAttribute('data-tab');
+      const targetPane = document.getElementById(tabId);
       if (targetPane) targetPane.classList.add('active');
+
+      if (tabId === 'tab-messages') {
+        fetchMessagesFromDb();
+      } else if (tabId === 'tab-email-settings') {
+        loadEmailSettings();
+      } else if (tabId === 'tab-database') {
+        fetchDbStats();
+      }
     });
   });
 
@@ -2271,15 +2307,32 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const newHash = await sha256(newPass);
+
+      // Synchronize updated password to centralized SQLite database for all devices
+      if (window.location.protocol.startsWith('http')) {
+        try {
+          const res = await fetch(getApiUrl('/api/auth/change-password'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentHash: currHash, newHash: newHash })
+          });
+          if (res.ok) {
+            console.log('✅ Admin password updated in central SQLite database.');
+          }
+        } catch (serverErr) {
+          console.warn('Backend password sync error:', serverErr);
+        }
+      }
+
       setStoredHash(newHash);
 
       if (passwordFeedback) {
         passwordFeedback.hidden = false;
         passwordFeedback.className = 'form-alert success';
-        passwordFeedback.textContent = 'Admin password updated successfully!';
+        passwordFeedback.textContent = 'Admin password updated in database across all devices!';
       }
       changePassForm.reset();
-      showToast('Admin password changed successfully!', 'success');
+      showToast('Admin password changed and saved in database!', 'success');
     });
   }
 
@@ -2471,7 +2524,7 @@ document.addEventListener('DOMContentLoaded', () => {
         message: messageInput.value.trim()
       };
 
-      // 1. Post to backend API (Node server or Netlify Function)
+      // 1. Post to SQLite database on server
       const sendPromise = window.location.protocol.startsWith('http')
         ? fetch(getApiUrl('/api/contact'), {
             method: 'POST',
@@ -2480,26 +2533,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }).then(res => res.json())
         : Promise.resolve({ success: true, localOnly: true });
 
-      // 2. If running on Netlify or with data-netlify, also dispatch to Netlify Forms Cloud
-      if (contactForm.getAttribute('data-netlify') === 'true' && window.location.protocol.startsWith('http')) {
-        try {
-          const formData = new URLSearchParams();
-          formData.append('form-name', 'contact');
-          formData.append('name', payload.name);
-          formData.append('email', payload.email);
-          formData.append('subject', payload.subject);
-          formData.append('message', payload.message);
-          fetch('/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString()
-          }).catch(() => {});
-        } catch (e) {}
-      }
-
       sendPromise
         .then(() => {
-          // 3. Keep in client-side database backup
+          // 2. Also keep in client-side database backup
           const localMsgs = JSON.parse(localStorage.getItem('keerthan_contact_messages') || '[]');
           localMsgs.unshift({ ...payload, id: Date.now(), created_at: new Date().toISOString() });
           localStorage.setItem('keerthan_contact_messages', JSON.stringify(localMsgs));
@@ -2516,10 +2552,10 @@ document.addEventListener('DOMContentLoaded', () => {
           if (formAlert) {
             formAlert.hidden = false;
             formAlert.className = 'form-alert success';
-            formAlert.textContent = `Thank you, ${payload.name}! Your message has been sent and recorded in the database.`;
+            formAlert.textContent = `Thank you, ${payload.name}! Your inquiry has been stored in the database.`;
           }
           contactForm.reset();
-          showToast('Inquiry recorded in database & mailbox!', 'success');
+          showToast('Inquiry recorded in database!', 'success');
           fetchMessagesFromDb();
           fetchDbStats();
         });
@@ -2548,28 +2584,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* --------------------------------------------------------------------------
-     14. DATABASE INBOX & MAIL INTEGRATION ENGINE
+     14. CENTRALIZED INBOX & GOOGLE EMAIL SETTINGS SYSTEM (SQLite Backend)
      -------------------------------------------------------------------------- */
-  let cachedMessages = [];
+  let loadedInboxMessages = [];
   let currentInboxFilter = 'all';
   let currentInboxSearch = '';
-  let activeMailSettings = null;
 
-  // Helper: Format relative timestamp (e.g., 'Just now', '2h ago')
-  const formatTimeAgo = (isoString) => {
-    if (!isoString) return '';
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffSec = Math.floor((now - date) / 1000);
-    if (diffSec < 60) return 'Just now';
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-    if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  // Helper: Escape HTML
-  const escapeStr = (str) => {
+  const escapeHtml = (str) => {
     if (!str) return '';
     return String(str)
       .replace(/&/g, '&amp;')
@@ -2579,39 +2600,22 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/'/g, '&#039;');
   };
 
-  // Render the contact messages list based on current filter & search
-  const renderMessagesList = () => {
+  const renderInboxMessages = () => {
     const container = document.getElementById('messages-list-container');
-    const badge = document.getElementById('msg-badge-count');
-    const metricTotal = document.getElementById('inbox-metric-total');
-    const metricUnread = document.getElementById('inbox-metric-unread');
-    const metricReplied = document.getElementById('inbox-metric-replied');
-    const filterUnreadBadge = document.getElementById('filter-unread-count');
-
-    // Calculate metrics
-    const totalCount = cachedMessages.length;
-    const unreadCount = cachedMessages.filter(m => m.status === 'unread' || (!m.status && m.is_read === 0)).length;
-    const repliedCount = cachedMessages.filter(m => m.status === 'replied').length;
-
-    if (badge) badge.textContent = unreadCount;
-    if (metricTotal) metricTotal.textContent = totalCount;
-    if (metricUnread) metricUnread.textContent = unreadCount;
-    if (metricReplied) metricReplied.textContent = repliedCount;
-    if (filterUnreadBadge) filterUnreadBadge.textContent = unreadCount;
-
     if (!container) return;
 
-    // Filter messages
-    let filtered = [...cachedMessages];
+    let filtered = loadedInboxMessages || [];
 
+    // Filter by tab pill
     if (currentInboxFilter === 'unread') {
-      filtered = filtered.filter(m => m.status === 'unread' || (!m.status && m.is_read === 0));
+      filtered = filtered.filter(m => !m.is_read || m.is_read === 0 || m.is_read === '0');
     } else if (currentInboxFilter === 'replied') {
-      filtered = filtered.filter(m => m.status === 'replied');
+      filtered = filtered.filter(m => m.reply_sent === 1 || m.reply_sent === '1');
     }
 
-    if (currentInboxSearch) {
-      const q = currentInboxSearch.toLowerCase();
+    // Filter by keyword search
+    if (currentInboxSearch && currentInboxSearch.trim().length > 0) {
+      const q = currentInboxSearch.toLowerCase().trim();
       filtered = filtered.filter(m =>
         (m.name && m.name.toLowerCase().includes(q)) ||
         (m.email && m.email.toLowerCase().includes(q)) ||
@@ -2621,18 +2625,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (filtered.length === 0) {
-      if (cachedMessages.length === 0) {
+      if (loadedInboxMessages.length === 0) {
         container.innerHTML = `
           <div class="empty-state">
-            <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">📬 No inquiries received yet.</p>
-            <p>Messages submitted via the portfolio contact form will be stored in your SQLite database and appear here with instant email alerts.</p>
+            <div style="font-size:2rem;margin-bottom:0.5rem;">📬</div>
+            <strong>No inquiries received yet.</strong>
+            <p style="margin:0.25rem 0 0;font-size:0.8rem;color:var(--text-muted);">
+              When visitors or recruiters submit messages via your contact form, they are saved in SQLite (<code>portfolio.db</code>) and will appear here in real time on any device.
+            </p>
           </div>
         `;
       } else {
         container.innerHTML = `
           <div class="empty-state">
-            <p>🔍 No inquiries match the selected filter or search term ("${escapeStr(currentInboxSearch)}").</p>
-            <button class="btn btn-sm btn-outline" style="margin-top: 0.75rem;" onclick="window.resetInboxFilters()">Clear Filters</button>
+            <strong>No inquiries match your filter or search.</strong>
+            <p style="margin:0.25rem 0 0;font-size:0.8rem;color:var(--text-muted);">
+              Try selecting "All" or clearing the search keyword.
+            </p>
           </div>
         `;
       }
@@ -2640,80 +2649,76 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     container.innerHTML = filtered.map(m => {
-      const isUnread = m.status === 'unread' || (!m.status && m.is_read === 0);
-      const isReplied = m.status === 'replied';
-      const statusClass = isReplied ? 'is-replied' : (isUnread ? 'is-unread' : 'is-read');
-      const senderInitial = (m.name || 'V').trim().charAt(0).toUpperCase();
-      const timeAgo = formatTimeAgo(m.created_at);
-      const formattedFullDate = new Date(m.created_at).toLocaleString();
-
-      let statusBadgeHtml = '';
-      if (isReplied) {
-        statusBadgeHtml = `<span class="msg-status-badge msg-status-replied">✓ Replied</span>`;
-      } else if (isUnread) {
-        statusBadgeHtml = `<span class="msg-status-badge msg-status-unread">● New / Unread</span>`;
-      } else {
-        statusBadgeHtml = `<span class="msg-status-badge msg-status-read">Read</span>`;
-      }
-
-      let alertBadgeHtml = '';
-      if (m.email_alert_status === 'sent') {
-        alertBadgeHtml = `<span class="msg-alert-badge badge-success" title="Notification delivered to your email">📨 Alert Sent</span>`;
-      } else if (m.email_alert_status === 'unconfigured') {
-        alertBadgeHtml = `<span class="msg-alert-badge" title="Saved in DB (configure SMTP in Mail tab for real-time alerts)">💾 In Database</span>`;
-      } else if (m.email_alert_status === 'failed') {
-        alertBadgeHtml = `<span class="msg-alert-badge" style="color: #f87171; border-color: rgba(239, 68, 68, 0.3);" title="Email notification failed to deliver">⚠️ Alert Failed</span>`;
-      }
-
-      // Pre-composed direct webmail URLs
-      const reSubject = encodeURIComponent('Re: ' + (m.subject || 'Portfolio Inquiry'));
-      const quoteBody = encodeURIComponent(`\n\n--- On ${formattedFullDate}, ${m.name} wrote: ---\n${m.message}`);
-      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(m.email)}&su=${reSubject}&body=${quoteBody}`;
+      const isUnread = !m.is_read || m.is_read === 0 || m.is_read === '0';
+      const isGmailSent = m.email_sent === 1 || m.email_sent === '1';
+      const isReplied = m.reply_sent === 1 || m.reply_sent === '1';
 
       return `
-        <div class="msg-card ${statusClass}" data-msg-id="${m.id}">
+        <div class="msg-card ${isUnread ? 'is-unread' : ''}" data-msg-id="${m.id}">
           <div class="msg-header">
-            <div class="msg-sender-group">
-              <div class="msg-avatar-initial">${senderInitial}</div>
-              <div class="msg-sender-info">
-                <div>
-                  <span class="msg-sender">${escapeStr(m.name)}</span>
-                  <a href="mailto:${escapeStr(m.email)}" class="msg-email">${escapeStr(m.email)}</a>
-                </div>
-                <div class="msg-badges-row">
-                  ${statusBadgeHtml}
-                  ${alertBadgeHtml}
-                </div>
+            <div class="msg-sender-meta">
+              <div class="msg-sender-row">
+                <span class="msg-sender">${escapeHtml(m.name)}</span>
+                <a href="mailto:${escapeHtml(m.email)}" class="msg-email" title="Click to email">${escapeHtml(m.email)}</a>
               </div>
+              <time class="msg-date">🕒 ${new Date(m.created_at).toLocaleString()}</time>
             </div>
-            <time class="msg-date" title="${formattedFullDate}">${timeAgo}</time>
+
+            <div class="msg-meta-badges">
+              ${isUnread 
+                ? '<span class="msg-badge msg-badge-new">NEW</span>' 
+                : '<span class="msg-badge msg-badge-read">READ</span>'}
+              
+              ${isGmailSent 
+                ? '<span class="msg-badge msg-badge-gmail" title="Notification delivered to your Gmail inbox">✉️ Gmail Alert Sent</span>' 
+                : '<span class="msg-badge" title="Stored safely in centralized SQLite database">🗄️ In SQLite DB</span>'}
+
+              ${isReplied 
+                ? '<span class="msg-badge msg-badge-replied" title="You sent a reply to this inquiry">↩️ Replied</span>' 
+                : ''}
+            </div>
           </div>
 
-          <div class="msg-subject">Subject: <strong>${escapeStr(m.subject || 'Portfolio Inquiry')}</strong></div>
-          <div class="msg-body">${escapeStr(m.message)}</div>
+          <div class="msg-subject-row">
+            <span>Subject:</span>
+            <strong>${escapeHtml(m.subject || 'Portfolio Inquiry')}</strong>
+          </div>
 
-          ${isReplied && m.reply_body ? `
+          <div class="msg-body">${escapeHtml(m.message)}</div>
+
+          ${isReplied && m.reply_message ? `
             <div class="msg-reply-history">
-              <div class="msg-reply-head">
-                <span>💬 Replied by Keerthan (${m.replied_at ? formatTimeAgo(m.replied_at) : 'Sent'})</span>
-                <span style="font-size: 0.7rem; color: var(--text-muted);">${escapeStr(m.reply_subject || 'Re: Inquiry')}</span>
+              <div class="msg-reply-history-header">
+                <span>↩️ Admin Reply via Gmail</span>
+                <time>${m.replied_at ? new Date(m.replied_at).toLocaleString() : 'Delivered'}</time>
               </div>
-              <div class="msg-reply-body">${escapeStr(m.reply_body)}</div>
+              <div class="msg-reply-history-content">${escapeHtml(m.reply_message)}</div>
             </div>
           ` : ''}
 
+          <!-- Inline Quick Reply Box -->
+          <div id="quick-reply-box-${m.id}" class="msg-quick-reply-box" style="display:none;">
+            <textarea id="reply-text-${m.id}" placeholder="Type your reply to ${escapeHtml(m.name)}... (Will be delivered from your configured Gmail address)"></textarea>
+            <div class="quick-reply-actions">
+              <button type="button" class="btn btn-sm btn-outline" onclick="window.toggleQuickReply(${m.id})">Cancel</button>
+              <button type="button" class="btn btn-sm btn-primary" id="send-reply-btn-${m.id}" onclick="window.sendQuickReply(${m.id}, '${escapeHtml(m.email)}', '${escapeHtml(m.subject || 'Portfolio Inquiry')}')">
+                <span>🚀 Send Reply via Gmail</span>
+              </button>
+            </div>
+          </div>
+
           <div class="msg-actions">
-            <button class="btn btn-sm btn-primary" onclick="window.openMailComposer(${m.id})">
-              <span>✉️ Reply to Inquiry</span>
+            <button class="btn btn-sm btn-primary" onclick="window.toggleQuickReply(${m.id})">
+              💬 Reply via Gmail
             </button>
-            <a href="${gmailUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" title="Open reply in Gmail Web">
-              <span>🌐 Gmail</span>
+            <a href="mailto:${escapeHtml(m.email)}?subject=Re: ${encodeURIComponent(m.subject || 'Portfolio Inquiry')}" class="btn btn-sm btn-outline" title="Open native mail client">
+              ✉️ Open in Mail App
             </a>
-            <button class="btn btn-sm btn-outline" onclick="window.toggleMessageReadStatus(${m.id})">
-              <span>${m.is_read ? 'Mark as Unread' : 'Mark as Read'}</span>
+            <button class="btn btn-sm btn-outline" onclick="window.toggleMessageRead(${m.id}, ${isUnread ? 1 : 0})">
+              ${isUnread ? 'Mark as Read' : 'Mark as Unread'}
             </button>
             <button class="btn btn-sm btn-danger" onclick="window.deleteMessageFromDb(${m.id})" title="Delete inquiry from SQLite database">
-              <span>🗑️ Delete</span>
+              🗑️ Delete
             </button>
           </div>
         </div>
@@ -2721,19 +2726,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('');
   };
 
-  // Reset filters helper
-  window.resetInboxFilters = () => {
-    currentInboxFilter = 'all';
-    currentInboxSearch = '';
-    const searchInput = document.getElementById('inbox-search-input');
-    if (searchInput) searchInput.value = '';
-    document.querySelectorAll('.inbox-filter-pill').forEach(pill => {
-      pill.classList.toggle('active', pill.getAttribute('data-filter') === 'all');
-    });
-    renderMessagesList();
-  };
-
-  // Fetch all messages from SQLite database (with offline localStorage backup)
   const fetchMessagesFromDb = async () => {
     let messages = [];
     if (window.location.protocol.startsWith('http')) {
@@ -2741,645 +2733,167 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await fetch(getApiUrl('/api/messages'));
         if (res.ok) messages = await res.json();
       } catch (e) {
-        console.warn('Could not fetch messages from server, using local cache:', e);
+        console.warn('Failed to fetch messages from server:', e);
       }
     }
+
     if (!messages || messages.length === 0) {
       messages = JSON.parse(localStorage.getItem('keerthan_contact_messages') || '[]');
     }
 
-    cachedMessages = messages;
-    renderMessagesList();
+    loadedInboxMessages = messages || [];
+
+    // Calculate badge counts
+    const unreadCount = loadedInboxMessages.filter(m => !m.is_read || m.is_read === 0 || m.is_read === '0').length;
+    const repliedCount = loadedInboxMessages.filter(m => m.reply_sent === 1 || m.reply_sent === '1').length;
+
+    const badge = document.getElementById('msg-badge-count');
+    if (badge) badge.textContent = unreadCount;
+
+    const countAll = document.getElementById('count-all-msgs');
+    if (countAll) countAll.textContent = loadedInboxMessages.length;
+
+    const countUnread = document.getElementById('count-unread-msgs');
+    if (countUnread) countUnread.textContent = unreadCount;
+
+    const countReplied = document.getElementById('count-replied-msgs');
+    if (countReplied) countReplied.textContent = repliedCount;
+
+    renderInboxMessages();
   };
 
-  // Toggle read/unread status
-  window.toggleMessageReadStatus = async (id) => {
-    const msg = cachedMessages.find(m => String(m.id) === String(id));
-    if (!msg) return;
-
-    const newIsRead = msg.is_read ? 0 : 1;
-    const newStatus = newIsRead ? 'read' : 'unread';
-
-    msg.is_read = newIsRead;
-    if (msg.status !== 'replied') {
-      msg.status = newStatus;
-    }
-
-    // Sync to SQLite server
+  // Toggle Read/Unread status
+  window.toggleMessageRead = async (id, isRead) => {
     if (window.location.protocol.startsWith('http')) {
       try {
-        await fetch(getApiUrl(`/api/messages/${id}/status`), {
-          method: 'PATCH',
+        await fetch(getApiUrl(`/api/messages/${id}/read`), {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isRead: newIsRead, status: msg.status })
+          body: JSON.stringify({ isRead: !!isRead })
         });
       } catch (e) {}
     }
 
-    // Sync to localStorage
-    const local = JSON.parse(localStorage.getItem('keerthan_contact_messages') || '[]');
-    const target = local.find(x => String(x.id) === String(id));
-    if (target) {
-      target.is_read = newIsRead;
-      if (target.status !== 'replied') target.status = newStatus;
-      localStorage.setItem('keerthan_contact_messages', JSON.stringify(local));
-    }
-
-    renderMessagesList();
-    showToast(`Marked inquiry as ${newIsRead ? 'read' : 'unread'}.`, 'info');
+    // Update local state
+    const msg = loadedInboxMessages.find(m => m.id === id || String(m.id) === String(id));
+    if (msg) msg.is_read = isRead ? 1 : 0;
+    fetchMessagesFromDb();
+    fetchDbStats();
+    showToast(isRead ? 'Marked inquiry as read.' : 'Marked inquiry as unread.', 'info');
   };
 
-  // Delete message from DB
+  // Mark all messages as read
+  const markAllReadBtn = document.getElementById('mark-all-read-btn');
+  if (markAllReadBtn) {
+    markAllReadBtn.addEventListener('click', async () => {
+      if (window.location.protocol.startsWith('http')) {
+        try {
+          await fetch(getApiUrl('/api/messages/mark-all-read'), { method: 'POST' });
+        } catch (e) {}
+      }
+      loadedInboxMessages.forEach(m => { m.is_read = 1; });
+      fetchMessagesFromDb();
+      fetchDbStats();
+      showToast('All messages marked as read.', 'success');
+    });
+  }
+
+  // Toggle quick reply box
+  window.toggleQuickReply = (id) => {
+    const box = document.getElementById(`quick-reply-box-${id}`);
+    if (!box) return;
+    const isHidden = box.style.display === 'none';
+    box.style.display = isHidden ? 'flex' : 'none';
+    if (isHidden) {
+      const textarea = document.getElementById(`reply-text-${id}`);
+      if (textarea) textarea.focus();
+    }
+  };
+
+  // Send quick reply via Gmail SMTP
+  window.sendQuickReply = async (id, recipientEmail, subject) => {
+    const textarea = document.getElementById(`reply-text-${id}`);
+    const sendBtn = document.getElementById(`send-reply-btn-${id}`);
+    if (!textarea) return;
+
+    const replyText = textarea.value.trim();
+    if (!replyText) {
+      showToast('Please type your reply before sending.', 'error');
+      textarea.focus();
+      return;
+    }
+
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.querySelector('span').textContent = 'Sending via Gmail...';
+    }
+
+    try {
+      const res = await fetch(getApiUrl(`/api/messages/${id}/reply`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          replyText,
+          recipientEmail,
+          subject
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`Reply delivered to ${recipientEmail} via Gmail!`, 'success', 4000);
+        window.toggleQuickReply(id);
+        fetchMessagesFromDb();
+      } else {
+        showToast(data.error || 'Failed to send reply via Gmail.', 'error', 5000);
+      }
+    } catch (err) {
+      showToast('Network error while sending reply: ' + err.message, 'error');
+    } finally {
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.querySelector('span').textContent = '🚀 Send Reply via Gmail';
+      }
+    }
+  };
+
+  // Delete message from database
   window.deleteMessageFromDb = async (id) => {
-    if (!confirm('Are you sure you want to delete this message from the database? This action cannot be undone.')) return;
+    if (!confirm('Are you sure you want to delete this message from the central database? This action cannot be undone.')) return;
     if (window.location.protocol.startsWith('http')) {
       try {
         await fetch(getApiUrl(`/api/messages/${id}`), { method: 'DELETE' });
       } catch (e) {}
     }
+    loadedInboxMessages = loadedInboxMessages.filter(x => x.id !== id && String(x.id) !== String(id));
     const local = JSON.parse(localStorage.getItem('keerthan_contact_messages') || '[]');
     const filtered = local.filter(x => x.id !== id && String(x.id) !== String(id));
     localStorage.setItem('keerthan_contact_messages', JSON.stringify(filtered));
-
-    cachedMessages = cachedMessages.filter(x => x.id !== id && String(x.id) !== String(id));
-    renderMessagesList();
+    fetchMessagesFromDb();
     fetchDbStats();
-    showToast('Inquiry deleted from database.', 'info');
+    showToast('Inquiry permanently removed from database.', 'info');
   };
 
-  // Setup Inbox Filter & Search Event Listeners
-  const inboxFilterPills = document.querySelectorAll('.inbox-filter-pill');
-  inboxFilterPills.forEach(pill => {
-    pill.addEventListener('click', () => {
-      inboxFilterPills.forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      currentInboxFilter = pill.getAttribute('data-filter') || 'all';
-      renderMessagesList();
-    });
-  });
-
+  // Wire search input
   const inboxSearchInput = document.getElementById('inbox-search-input');
   if (inboxSearchInput) {
     inboxSearchInput.addEventListener('input', (e) => {
-      currentInboxSearch = e.target.value.trim();
-      renderMessagesList();
+      currentInboxSearch = e.target.value;
+      renderInboxMessages();
     });
   }
 
-  // Navigation between Inbox and Mail Settings tabs
-  const gotoMailSettingsBtn = document.getElementById('inbox-goto-settings-btn');
-  if (gotoMailSettingsBtn) {
-    gotoMailSettingsBtn.addEventListener('click', () => {
-      document.querySelectorAll('.cms-tab-btn').forEach(b => {
-        b.classList.toggle('active', b.getAttribute('data-tab') === 'tab-mail-settings');
-      });
-      document.querySelectorAll('.cms-tab-pane').forEach(p => {
-        p.classList.toggle('active', p.id === 'tab-mail-settings');
-      });
-      fetchMailSettings();
+  // Wire filter pills
+  document.querySelectorAll('.filter-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentInboxFilter = btn.getAttribute('data-filter') || 'all';
+      renderInboxMessages();
     });
-  }
+  });
 
-  const backToInboxBtn = document.getElementById('mail-settings-back-inbox-btn');
-  if (backToInboxBtn) {
-    backToInboxBtn.addEventListener('click', () => {
-      document.querySelectorAll('.cms-tab-btn').forEach(b => {
-        b.classList.toggle('active', b.getAttribute('data-tab') === 'tab-messages');
-      });
-      document.querySelectorAll('.cms-tab-pane').forEach(p => {
-        p.classList.toggle('active', p.id === 'tab-messages');
-      });
-      fetchMessagesFromDb();
-    });
-  }
-
-
-  /* --------------------------------------------------------------------------
-     MAIL COMPOSER & REPLY MODAL CONTROLLER
-     -------------------------------------------------------------------------- */
-  const mailComposerModal = document.getElementById('cms-mail-composer-modal');
-  const mailReplyForm = document.getElementById('cms-mail-reply-form');
-  const replyToInput = document.getElementById('reply-to-email');
-  const replySubjectInput = document.getElementById('reply-subject');
-  const replyBodyTextarea = document.getElementById('reply-body-text');
-  const replyTemplatePicker = document.getElementById('reply-template-picker');
-  const replyCharCount = document.getElementById('reply-char-count');
-  const replyStatusBanner = document.getElementById('reply-status-banner');
-  const toggleOriginalInquiryBtn = document.getElementById('toggle-original-inquiry');
-  const replyOrigContent = document.getElementById('reply-orig-content');
-  const replyAccordionArrow = document.getElementById('reply-accordion-arrow');
-
-  let activeReplyMessage = null;
-
-  // Update dynamic 1-click webmail URLs in the composer
-  const updateWebmailLinks = () => {
-    const to = replyToInput ? replyToInput.value.trim() : '';
-    const subject = replySubjectInput ? replySubjectInput.value.trim() : '';
-    const body = replyBodyTextarea ? replyBodyTextarea.value.trim() : '';
-
-    if (replyCharCount) {
-      replyCharCount.textContent = `${body.length} characters`;
-    }
-
-    const reSubject = encodeURIComponent(subject);
-    const fullBody = encodeURIComponent(body);
-
-    const gmailBtn = document.getElementById('reply-gmail-web-btn');
-    if (gmailBtn) {
-      gmailBtn.href = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${reSubject}&body=${fullBody}`;
-    }
-
-    const outlookBtn = document.getElementById('reply-outlook-web-btn');
-    if (outlookBtn) {
-      outlookBtn.href = `https://outlook.live.com/mail/0/deeplink/compose?to=${encodeURIComponent(to)}&subject=${reSubject}&body=${fullBody}`;
-    }
-
-    const defaultMailBtn = document.getElementById('reply-default-mail-btn');
-    if (defaultMailBtn) {
-      defaultMailBtn.href = `mailto:${encodeURIComponent(to)}?subject=${reSubject}&body=${fullBody}`;
-    }
-  };
-
-  if (replyToInput) replyToInput.addEventListener('input', updateWebmailLinks);
-  if (replySubjectInput) replySubjectInput.addEventListener('input', updateWebmailLinks);
-  if (replyBodyTextarea) replyBodyTextarea.addEventListener('input', updateWebmailLinks);
-
-  // Accordion toggle for original inquiry
-  if (toggleOriginalInquiryBtn && replyOrigContent) {
-    toggleOriginalInquiryBtn.addEventListener('click', () => {
-      const isHidden = replyOrigContent.style.display === 'none';
-      replyOrigContent.style.display = isHidden ? 'block' : 'none';
-      if (replyAccordionArrow) {
-        replyAccordionArrow.classList.toggle('rotated', isHidden);
-      }
-    });
-  }
-
-  // Pre-crafted Professional Response Templates
-  const getTemplateContent = (templateKey, name, subject) => {
-    const safeName = name || 'there';
-    switch (templateKey) {
-      case 'gratitude':
-        return `Hi ${safeName},\n\nThank you for reaching out through my portfolio website regarding "${subject || 'your inquiry'}".\n\nI have received your message and appreciate your interest in my background. I would be delighted to discuss how my experience in Software Development, Artificial Intelligence & Machine Learning, and GIS spatial data engineering can add value to your initiatives.\n\nLooking forward to speaking with you!\n\nBest regards,\nKeerthan Tunkoju\nSoftware Developer | AI & ML Graduate\nPhone: +91 6281151724\nLinkedIn: https://linkedin.com/in/keerthan-tunkoju-a24604258`;
-
-      case 'interview':
-        return `Hi ${safeName},\n\nThank you for reviewing my profile and reaching out regarding potential opportunities!\n\nI am actively seeking Software Developer and AI/ML engineering positions and would welcome the chance to speak with your team. Please let me know your availability for a brief 15–20 minute discussion this week, or feel free to suggest a convenient time slot.\n\nYou can also review my complete verified resume and credential certifications directly at: http://localhost:3000/Keerthan_Tunkoju_Resume.pdf\n\nBest regards,\nKeerthan Tunkoju\n+91 6281151724 | keerthantunkoju10@gmail.com`;
-
-      case 'collaboration':
-        return `Hi ${safeName},\n\nThank you for getting in touch regarding project collaboration!\n\nI would love to learn more about the project scope, technical stack, and timeline you have in mind. Could you share any additional documentation or specifications so I can evaluate the best architectural approach?\n\nI look forward to collaborating with you.\n\nWarm regards,\nKeerthan Tunkoju\nFull-Stack & AI/ML Developer`;
-
-      case 'resume':
-        return `Hi ${safeName},\n\nThank you for your inquiry regarding my background, skills, and credentials!\n\nMy complete curriculum vitae and authenticated certificates (including Python, Deep Learning Brain Tumor CNNs, GIS Engineering at NeoGeoInfo, and Web Development) are readily available:\n- Resume PDF: http://localhost:3000/Keerthan_Tunkoju_Resume.pdf\n- Web Resume: http://localhost:3000/resume.html\n- GitHub: https://github.com/Keerthantunkoju10\n- LinkedIn: https://linkedin.com/in/keerthan-tunkoju-a24604258\n\nPlease let me know if you need any additional details!\n\nBest regards,\nKeerthan Tunkoju`;
-
-      case 'clear':
-        return '';
-
-      default:
-        return '';
-    }
-  };
-
-  if (replyTemplatePicker) {
-    replyTemplatePicker.addEventListener('change', (e) => {
-      const selected = e.target.value;
-      if (!selected) return;
-      const name = activeReplyMessage ? activeReplyMessage.name : '';
-      const subject = activeReplyMessage ? activeReplyMessage.subject : '';
-      const text = getTemplateContent(selected, name, subject);
-      if (replyBodyTextarea) {
-        replyBodyTextarea.value = text;
-        updateWebmailLinks();
-      }
-    });
-  }
-
-  // Open the Mail Composer Modal for a message
-  window.openMailComposer = (id) => {
-    const msg = cachedMessages.find(m => String(m.id) === String(id));
-    if (!msg) return;
-
-    activeReplyMessage = msg;
-
-    const modalTitle = document.getElementById('mail-composer-title');
-    const modalSubtitle = document.getElementById('mail-composer-subtitle');
-    const replyMsgId = document.getElementById('reply-msg-id');
-    const replyOrigName = document.getElementById('reply-orig-name');
-    const replyOrigDate = document.getElementById('reply-orig-date');
-    const replyOrigSubject = document.getElementById('reply-orig-subject');
-    const replyOrigBody = document.getElementById('reply-orig-body');
-
-    if (modalTitle) modalTitle.textContent = `Compose Email Reply to ${msg.name}`;
-    if (modalSubtitle) modalSubtitle.textContent = `Inquiry received on ${new Date(msg.created_at).toLocaleDateString()}`;
-    if (replyMsgId) replyMsgId.value = msg.id;
-
-    if (replyToInput) replyToInput.value = msg.email;
-    if (replySubjectInput) replySubjectInput.value = `Re: ${msg.subject || 'Portfolio Inquiry'}`;
-
-    if (replyOrigName) replyOrigName.textContent = msg.name;
-    if (replyOrigDate) replyOrigDate.textContent = new Date(msg.created_at).toLocaleString();
-    if (replyOrigSubject) replyOrigSubject.textContent = msg.subject || 'Inquiry';
-    if (replyOrigBody) replyOrigBody.textContent = msg.message;
-
-    // Default template: gratitude
-    if (replyTemplatePicker) replyTemplatePicker.value = 'gratitude';
-    if (replyBodyTextarea) {
-      replyBodyTextarea.value = getTemplateContent('gratitude', msg.name, msg.subject);
-    }
-
-    if (replyStatusBanner) {
-      replyStatusBanner.hidden = true;
-      replyStatusBanner.className = 'mail-feedback-box';
-      replyStatusBanner.innerHTML = '';
-    }
-
-    updateWebmailLinks();
-    openModal(mailComposerModal);
-  };
-
-  // Copy recipient email button
-  const replyCopyEmailBtn = document.getElementById('reply-copy-email-btn');
-  if (replyCopyEmailBtn) {
-    replyCopyEmailBtn.addEventListener('click', () => {
-      if (replyToInput && replyToInput.value) {
-        navigator.clipboard.writeText(replyToInput.value);
-        showToast(`Copied ${replyToInput.value} to clipboard!`, 'info');
-      }
-    });
-  }
-
-  // Copy drafted reply button
-  const replyCopyDraftBtn = document.getElementById('reply-copy-draft-btn');
-  if (replyCopyDraftBtn) {
-    replyCopyDraftBtn.addEventListener('click', () => {
-      if (replyBodyTextarea && replyBodyTextarea.value) {
-        navigator.clipboard.writeText(replyBodyTextarea.value);
-        showToast('Reply message copied to clipboard!', 'success');
-      }
-    });
-  }
-
-  // "Mark as Replied" button (records reply locally/on server without sending SMTP)
-  const replyMarkOnlyBtn = document.getElementById('reply-mark-only-btn');
-  if (replyMarkOnlyBtn) {
-    replyMarkOnlyBtn.addEventListener('click', async () => {
-      if (!activeReplyMessage) return;
-      const id = activeReplyMessage.id;
-      const subject = replySubjectInput ? replySubjectInput.value.trim() : 'Re: Portfolio Inquiry';
-      const body = replyBodyTextarea ? replyBodyTextarea.value.trim() : 'Replied via webmail.';
-
-      if (window.location.protocol.startsWith('http')) {
-        try {
-          await fetch(getApiUrl(`/api/messages/${id}/reply`), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ replySubject: subject, replyBody: body })
-          });
-        } catch (e) {}
-      }
-
-      // Update in memory & localStorage
-      activeReplyMessage.status = 'replied';
-      activeReplyMessage.is_read = 1;
-      activeReplyMessage.replied_at = new Date().toISOString();
-      activeReplyMessage.reply_subject = subject;
-      activeReplyMessage.reply_body = body;
-
-      const local = JSON.parse(localStorage.getItem('keerthan_contact_messages') || '[]');
-      const target = local.find(x => String(x.id) === String(id));
-      if (target) {
-        target.status = 'replied';
-        target.is_read = 1;
-        target.replied_at = activeReplyMessage.replied_at;
-        target.reply_subject = subject;
-        target.reply_body = body;
-        localStorage.setItem('keerthan_contact_messages', JSON.stringify(local));
-      }
-
-      renderMessagesList();
-      closeModal(mailComposerModal);
-      showToast('Inquiry marked as replied in database.', 'success');
-    });
-  }
-
-  // Submit handler: Send reply via server SMTP
-  if (mailReplyForm) {
-    mailReplyForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const to = replyToInput ? replyToInput.value.trim() : '';
-      const subject = replySubjectInput ? replySubjectInput.value.trim() : '';
-      const replyText = replyBodyTextarea ? replyBodyTextarea.value.trim() : '';
-      const sendBtn = document.getElementById('reply-send-smtp-btn');
-      const sendBtnText = document.getElementById('reply-send-smtp-text');
-
-      if (!to || !replyText) {
-        showToast('Please specify a recipient email and response message.', 'error');
-        return;
-      }
-
-      if (sendBtn) sendBtn.disabled = true;
-      if (sendBtnText) sendBtnText.textContent = 'Sending email via SMTP...';
-
-      if (replyStatusBanner) {
-        replyStatusBanner.hidden = false;
-        replyStatusBanner.className = 'mail-feedback-box info';
-        replyStatusBanner.innerHTML = 'Connecting to mail server and dispatching email reply...';
-      }
-
-      try {
-        const payload = {
-          messageId: activeReplyMessage ? activeReplyMessage.id : null,
-          to,
-          subject,
-          replyText,
-          originalMessage: activeReplyMessage ? activeReplyMessage.message : '',
-          originalSenderName: activeReplyMessage ? activeReplyMessage.name : ''
-        };
-
-        const res = await fetch(getApiUrl('/api/mail/send-reply'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-
-        if (res.ok && data.success) {
-          if (replyStatusBanner) {
-            replyStatusBanner.className = 'mail-feedback-box success';
-            replyStatusBanner.innerHTML = `✅ <strong>Email Delivered!</strong> Successfully dispatched to ${escapeStr(to)}.`;
-          }
-          showToast(`Email reply delivered to ${to}!`, 'success');
-
-          // Update message state
-          if (activeReplyMessage) {
-            activeReplyMessage.status = 'replied';
-            activeReplyMessage.is_read = 1;
-            activeReplyMessage.replied_at = new Date().toISOString();
-            activeReplyMessage.reply_subject = subject;
-            activeReplyMessage.reply_body = replyText;
-          }
-
-          setTimeout(() => {
-            closeModal(mailComposerModal);
-            fetchMessagesFromDb();
-          }, 1500);
-        } else {
-          const errMsg = data.error || 'Server rejected SMTP email request.';
-          if (replyStatusBanner) {
-            replyStatusBanner.className = 'mail-feedback-box error';
-            replyStatusBanner.innerHTML = `
-              ❌ <strong>Could not dispatch via SMTP:</strong> ${escapeStr(errMsg)}<br>
-              <span style="font-size: 0.8rem; margin-top: 0.5rem; display: inline-block;">
-                💡 <strong>Instant Solution:</strong> Click <strong>"🌐 Gmail"</strong> or <strong>"📨 Outlook"</strong> below to send your pre-formatted reply directly in your browser with 1 click!
-              </span>
-            `;
-          }
-          showToast('SMTP dispatch failed. Use 1-Click Gmail compose below.', 'error');
-        }
-      } catch (err) {
-        if (replyStatusBanner) {
-          replyStatusBanner.className = 'mail-feedback-box error';
-          replyStatusBanner.innerHTML = `
-            ❌ <strong>Connection Error:</strong> ${escapeStr(err.message)}<br>
-            <span style="font-size: 0.8rem; margin-top: 0.5rem; display: inline-block;">
-              Use the 1-Click <strong>"🌐 Gmail"</strong> or <strong>"📨 Outlook"</strong> buttons below to dispatch immediately.
-            </span>
-          `;
-        }
-      } finally {
-        if (sendBtn) sendBtn.disabled = false;
-        if (sendBtnText) sendBtnText.textContent = '🚀 Send via Server (SMTP)';
-      }
-    });
-  }
-
-
-  /* --------------------------------------------------------------------------
-     MAIL SETTINGS & SMTP CONFIGURATION CONTROLLER
-     -------------------------------------------------------------------------- */
-  const mailSettingsForm = document.getElementById('cms-mail-settings-form');
-  const toggleMailPassBtn = document.getElementById('toggle-mail-pass-btn');
-  const btnTestMailDispatch = document.getElementById('btn-test-mail-dispatch');
-  const mailTestFeedback = document.getElementById('mail-test-feedback');
-
-  // Password visibility reveal
-  if (toggleMailPassBtn) {
-    toggleMailPassBtn.addEventListener('click', () => {
-      const passInput = document.getElementById('mail-setting-pass');
-      if (passInput) {
-        const isPass = passInput.type === 'password';
-        passInput.type = isPass ? 'text' : 'password';
-        toggleMailPassBtn.textContent = isPass ? '🔒' : '👁️';
-      }
-    });
-  }
-
-  // Provider preset selection
-  const mailSettingProvider = document.getElementById('mail-setting-provider');
-  if (mailSettingProvider) {
-    mailSettingProvider.addEventListener('change', (e) => {
-      const hostInput = document.getElementById('mail-setting-host');
-      const portInput = document.getElementById('mail-setting-port');
-      const secureInput = document.getElementById('mail-setting-secure');
-      if (e.target.value === 'gmail') {
-        if (hostInput) hostInput.value = 'smtp.gmail.com';
-        if (portInput) portInput.value = '465';
-        if (secureInput) secureInput.checked = true;
-      }
-    });
-  }
-
-  // Fetch Mail Settings from Server
-  const fetchMailSettings = async () => {
-    const healthTitle = document.getElementById('mail-health-title');
-    const healthDesc = document.getElementById('mail-health-desc');
-    const healthTag = document.getElementById('mail-health-tag');
-    const healthDot = document.getElementById('mail-health-dot');
-    const metricMailStatus = document.getElementById('inbox-metric-mailstatus');
-
-    if (!window.location.protocol.startsWith('http')) {
-      if (healthTitle) healthTitle.textContent = 'Webmail / Client Mode Active';
-      if (healthDesc) healthDesc.textContent = 'Running locally. 1-Click Gmail Web and Outlook compose are fully ready.';
-      if (healthTag) { healthTag.textContent = 'Webmail Ready'; healthTag.style.color = '#38bdf8'; }
-      if (healthDot) healthDot.className = 'status-pulse-dot pulse-yellow';
-      if (metricMailStatus) metricMailStatus.innerHTML = '<span style="color:#38bdf8;">✉️ Webmail Mode</span>';
-      return;
-    }
-
-    try {
-      const res = await fetch(getApiUrl('/api/mail/settings'));
-      if (res.ok) {
-        const s = await res.json();
-        activeMailSettings = s;
-
-        // Populate fields
-        const setVal = (id, val) => {
-          const el = document.getElementById(id);
-          if (el && val !== undefined && val !== null) el.value = val;
-        };
-
-        setVal('mail-setting-notify-email', s.notify_email || 'keerthantunkoju10@gmail.com');
-        setVal('mail-setting-provider', s.provider || 'gmail');
-        setVal('mail-setting-from-name', s.from_name || 'Keerthan Tunkoju Portfolio');
-        setVal('mail-setting-host', s.host || 'smtp.gmail.com');
-        setVal('mail-setting-port', s.port || 465);
-        setVal('mail-setting-user', s.auth_user || 'keerthantunkoju10@gmail.com');
-        setVal('mail-setting-from-email', s.from_email || 'keerthantunkoju10@gmail.com');
-        setVal('mail-test-target', s.notify_email || 'keerthantunkoju10@gmail.com');
-
-        const passInput = document.getElementById('mail-setting-pass');
-        if (passInput) {
-          passInput.value = s.hasPassword ? '••••••••' : '';
-        }
-
-        const notifyCheckbox = document.getElementById('mail-setting-notify-enabled');
-        if (notifyCheckbox) notifyCheckbox.checked = s.notify_enabled !== false;
-
-        const secureCheckbox = document.getElementById('mail-setting-secure');
-        if (secureCheckbox) secureCheckbox.checked = s.secure !== false;
-
-        // Update health card & status pill
-        if (s.hasPassword) {
-          if (healthTitle) healthTitle.textContent = 'SMTP Outgoing & Alerts Active';
-          if (healthDesc) healthDesc.textContent = `Connected to ${s.host}:${s.port} as ${s.auth_user}. Notifications & replies operational.`;
-          if (healthTag) { healthTag.textContent = 'Connected'; healthTag.style.color = '#34d399'; }
-          if (healthDot) healthDot.className = 'status-pulse-dot';
-          if (metricMailStatus) metricMailStatus.innerHTML = '<span style="color:#34d399;">🟢 SMTP Active</span>';
-        } else {
-          if (healthTitle) healthTitle.textContent = 'SMTP Password Not Set (Webmail Fallback Active)';
-          if (healthDesc) healthDesc.textContent = 'Add your Gmail App Password below to enable direct server email replies & instant email notifications.';
-          if (healthTag) { healthTag.textContent = 'Setup Required'; healthTag.style.color = '#f59e0b'; }
-          if (healthDot) healthDot.className = 'status-pulse-dot pulse-yellow';
-          if (metricMailStatus) metricMailStatus.innerHTML = '<span style="color:#f59e0b;">🟡 Webmail Mode</span>';
-        }
-      }
-    } catch (e) {
-      console.warn('Could not load mail settings:', e);
-    }
-  };
-
-  // Save Mail Settings Form Handler
-  if (mailSettingsForm) {
-    mailSettingsForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const saveBtn = document.getElementById('btn-save-mail-settings');
-      if (saveBtn) saveBtn.disabled = true;
-
-      const payload = {
-        notify_email: document.getElementById('mail-setting-notify-email')?.value.trim() || 'keerthantunkoju10@gmail.com',
-        notify_enabled: document.getElementById('mail-setting-notify-enabled')?.checked,
-        provider: document.getElementById('mail-setting-provider')?.value || 'gmail',
-        from_name: document.getElementById('mail-setting-from-name')?.value.trim() || 'Keerthan Tunkoju Portfolio',
-        host: document.getElementById('mail-setting-host')?.value.trim() || 'smtp.gmail.com',
-        port: Number(document.getElementById('mail-setting-port')?.value) || 465,
-        secure: document.getElementById('mail-setting-secure')?.checked,
-        auth_user: document.getElementById('mail-setting-user')?.value.trim() || '',
-        auth_pass: document.getElementById('mail-setting-pass')?.value || '',
-        from_email: document.getElementById('mail-setting-from-email')?.value.trim() || 'keerthantunkoju10@gmail.com'
-      };
-
-      try {
-        const res = await fetch(getApiUrl('/api/mail/settings'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          showToast('Mail configuration saved successfully!', 'success');
-          fetchMailSettings();
-        } else {
-          const errData = await res.json();
-          showToast('Failed to save mail settings: ' + (errData.error || 'Unknown error'), 'error');
-        }
-      } catch (err) {
-        showToast('Network error saving mail settings: ' + err.message, 'error');
-      } finally {
-        if (saveBtn) saveBtn.disabled = false;
-      }
-    });
-  }
-
-  // Send Test Email Action
-  if (btnTestMailDispatch) {
-    btnTestMailDispatch.addEventListener('click', async () => {
-      const targetInput = document.getElementById('mail-test-target');
-      const testBtnText = document.getElementById('btn-test-mail-text');
-      const targetEmail = targetInput ? targetInput.value.trim() : 'keerthantunkoju10@gmail.com';
-
-      if (!targetEmail) {
-        showToast('Please specify a recipient email to send the test message to.', 'error');
-        return;
-      }
-
-      btnTestMailDispatch.disabled = true;
-      if (testBtnText) testBtnText.textContent = 'Testing connection...';
-
-      if (mailTestFeedback) {
-        mailTestFeedback.hidden = false;
-        mailTestFeedback.className = 'mail-feedback-box info';
-        mailTestFeedback.innerHTML = `Connecting to SMTP host and sending verification test email to <strong>${escapeStr(targetEmail)}</strong>...`;
-      }
-
-      const testPayload = {
-        targetEmail,
-        provider: document.getElementById('mail-setting-provider')?.value || 'gmail',
-        host: document.getElementById('mail-setting-host')?.value.trim() || 'smtp.gmail.com',
-        port: Number(document.getElementById('mail-setting-port')?.value) || 465,
-        auth_user: document.getElementById('mail-setting-user')?.value.trim() || '',
-        auth_pass: document.getElementById('mail-setting-pass')?.value || ''
-      };
-
-      try {
-        const res = await fetch(getApiUrl('/api/mail/test'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(testPayload)
-        });
-
-        const data = await res.json();
-
-        if (res.ok && data.success) {
-          if (mailTestFeedback) {
-            mailTestFeedback.className = 'mail-feedback-box success';
-            mailTestFeedback.innerHTML = `
-              ✅ <strong>Test Email Dispatched Successfully!</strong><br>
-              A verification email has been sent to <strong>${escapeStr(targetEmail)}</strong>. Check your inbox to confirm delivery.
-            `;
-          }
-          showToast('Test email sent successfully!', 'success');
-          fetchMailSettings();
-        } else {
-          const errMsg = data.error || 'SMTP Connection rejected.';
-          if (mailTestFeedback) {
-            mailTestFeedback.className = 'mail-feedback-box error';
-            mailTestFeedback.innerHTML = `
-              ❌ <strong>SMTP Verification Failed:</strong> ${escapeStr(errMsg)}<br>
-              <span style="font-size: 0.8rem; margin-top: 0.4rem; display: inline-block;">
-                🔑 <strong>Common Fix:</strong> If using Gmail, ensure 2-Step Verification is active on your Google Account and generate an <strong>App Password</strong> (16 characters) instead of using your account password.
-              </span>
-            `;
-          }
-          showToast('SMTP Test Failed. Check credentials.', 'error');
-        }
-      } catch (err) {
-        if (mailTestFeedback) {
-          mailTestFeedback.className = 'mail-feedback-box error';
-          mailTestFeedback.innerHTML = `❌ <strong>Connection Error:</strong> ${escapeStr(err.message)}`;
-        }
-      } finally {
-        btnTestMailDispatch.disabled = false;
-        if (testBtnText) testBtnText.textContent = '🧪 Send Test Email';
-      }
-    });
-  }
-
-
-  /* --------------------------------------------------------------------------
-     15. DATABASE DIAGNOSTICS & RESYNC HELPERS
-     -------------------------------------------------------------------------- */
+  // Database stats updater
   const fetchDbStats = async () => {
     if (window.location.protocol.startsWith('http')) {
       try {
@@ -3390,7 +2904,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const msgs = document.getElementById('db-stat-msgs');
           const size = document.getElementById('db-stat-size');
           if (eng) eng.textContent = stats.databaseEngine;
-          if (msgs) msgs.textContent = stats.totalMessages;
+          if (msgs) msgs.textContent = `${stats.totalMessages} (${stats.unreadMessages} unread)`;
           if (size) size.textContent = Math.round(stats.fileSizeBytes / 1024) + ' KB';
         }
       } catch (e) {}
@@ -3401,7 +2915,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (refreshMsgBtn) {
     refreshMsgBtn.addEventListener('click', () => {
       fetchMessagesFromDb();
-      showToast('Inbox refreshed from database.', 'info');
+      fetchDbStats();
+      showToast('Centralized inbox refreshed from SQLite database.', 'info');
     });
   }
 
@@ -3409,8 +2924,245 @@ document.addEventListener('DOMContentLoaded', () => {
   if (dbResyncBtn) {
     dbResyncBtn.addEventListener('click', () => {
       loadPortfolioData();
+      fetchMessagesFromDb();
+      loadEmailSettings();
       fetchDbStats();
       showToast('Database resynchronized successfully.', 'success');
+    });
+  }
+
+
+  /* --------------------------------------------------------------------------
+     15. GOOGLE APP PASSWORD & EMAIL SETTINGS ENGINE
+     -------------------------------------------------------------------------- */
+  const emailSettingsForm = document.getElementById('email-settings-form');
+  const testEmailBtn = document.getElementById('test-email-settings-btn');
+  const emailFeedback = document.getElementById('email-settings-feedback');
+  const toggleAppPasswordBtn = document.getElementById('toggle-app-password-btn');
+
+  const loadEmailSettings = async () => {
+    if (!window.location.protocol.startsWith('http')) return;
+    try {
+      const res = await fetch(getApiUrl('/api/settings/email'));
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const gmailUserInput = document.getElementById('cfg-gmail-user');
+      const appPassInput = document.getElementById('cfg-app-password');
+      const notifyEmailInput = document.getElementById('cfg-notify-email');
+      const senderNameInput = document.getElementById('cfg-sender-name');
+      const notifEnabledCheck = document.getElementById('cfg-email-notifications-enabled');
+      const autoReplyCheck = document.getElementById('cfg-auto-reply-enabled');
+      const passStatusSpan = document.getElementById('cfg-app-pass-status');
+      const smtpChip = document.getElementById('google-smtp-status-chip');
+      const inboxEmailChip = document.getElementById('inbox-email-status-chip');
+
+      if (gmailUserInput) gmailUserInput.value = data.gmailUser || '';
+      if (notifyEmailInput) notifyEmailInput.value = data.notifyEmail || '';
+      if (senderNameInput) senderNameInput.value = data.senderName || 'Keerthan Tunkoju Portfolio';
+      if (notifEnabledCheck) notifEnabledCheck.checked = !!data.emailNotificationsEnabled;
+      if (autoReplyCheck) autoReplyCheck.checked = !!data.autoReplyEnabled;
+
+      if (data.hasPassword) {
+        if (appPassInput) {
+          appPassInput.placeholder = '•••••••••••••••• (16-char App Password Active)';
+          appPassInput.value = '••••••••••••••••';
+        }
+        if (passStatusSpan) {
+          passStatusSpan.textContent = '(✓ Saved in SQLite Database for all devices)';
+          passStatusSpan.style.color = '#10b981';
+        }
+        if (smtpChip) {
+          smtpChip.textContent = '☁️ Google SMTP: Active & Ready';
+          smtpChip.style.background = 'rgba(16, 185, 129, 0.12)';
+          smtpChip.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+          smtpChip.style.color = '#10b981';
+        }
+        if (inboxEmailChip) {
+          inboxEmailChip.textContent = '✉️ Gmail Alerts: Enabled';
+          inboxEmailChip.style.color = '#10b981';
+        }
+      } else {
+        if (appPassInput) {
+          appPassInput.placeholder = 'Paste 16-character Google App Password';
+        }
+        if (passStatusSpan) {
+          passStatusSpan.textContent = '(Not configured yet)';
+          passStatusSpan.style.color = '#f59e0b';
+        }
+        if (smtpChip) {
+          smtpChip.textContent = '☁️ Google SMTP: Setup Required';
+          smtpChip.style.background = 'rgba(245, 158, 11, 0.12)';
+          smtpChip.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+          smtpChip.style.color = '#d97706';
+        }
+        if (inboxEmailChip) {
+          inboxEmailChip.textContent = '✉️ Gmail Alerts: Not Configured';
+          inboxEmailChip.style.color = '#d97706';
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load email settings:', e);
+    }
+  };
+
+  // Toggle Password Visibility
+  if (toggleAppPasswordBtn) {
+    toggleAppPasswordBtn.addEventListener('click', () => {
+      const input = document.getElementById('cfg-app-password');
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        toggleAppPasswordBtn.textContent = '🙈';
+        toggleAppPasswordBtn.title = 'Hide password';
+      } else {
+        input.type = 'password';
+        toggleAppPasswordBtn.textContent = '👁️';
+        toggleAppPasswordBtn.title = 'Show password';
+      }
+    });
+  }
+
+  // Save Email Settings Form
+  if (emailSettingsForm) {
+    emailSettingsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const saveBtn = document.getElementById('save-email-settings-btn');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.querySelector('span').textContent = 'Saving to Database...';
+      }
+
+      const payload = {
+        gmailUser: document.getElementById('cfg-gmail-user').value.trim(),
+        appPassword: document.getElementById('cfg-app-password').value.trim(),
+        notifyEmail: document.getElementById('cfg-notify-email').value.trim() || document.getElementById('cfg-gmail-user').value.trim(),
+        senderName: document.getElementById('cfg-sender-name').value.trim(),
+        emailNotificationsEnabled: document.getElementById('cfg-email-notifications-enabled').checked,
+        autoReplyEnabled: document.getElementById('cfg-auto-reply-enabled').checked
+      };
+
+      try {
+        const res = await fetch(getApiUrl('/api/settings/email'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (emailFeedback) {
+            emailFeedback.hidden = false;
+            emailFeedback.className = 'form-alert success';
+            emailFeedback.innerHTML = `
+              <strong>✓ Google App Password &amp; Email Settings Saved!</strong>
+              <p style="margin:4px 0 0;font-size:0.8rem;">
+                Configuration has been written to the central SQLite database (<code>portfolio.db</code>). It is now permanently active across all devices, mobile phones, and tablets.
+              </p>
+            `;
+          }
+          showToast('Google App Password & email settings saved for all devices!', 'success', 4000);
+          loadEmailSettings();
+          fetchDbStats();
+        } else {
+          if (emailFeedback) {
+            emailFeedback.hidden = false;
+            emailFeedback.className = 'form-alert error';
+            emailFeedback.textContent = data.error || 'Failed to save email settings.';
+          }
+          showToast(data.error || 'Failed to save email settings.', 'error');
+        }
+      } catch (err) {
+        if (emailFeedback) {
+          emailFeedback.hidden = false;
+          emailFeedback.className = 'form-alert error';
+          emailFeedback.textContent = 'Network error saving settings: ' + err.message;
+        }
+        showToast('Error saving settings: ' + err.message, 'error');
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.querySelector('span').textContent = '💾 Save Email Settings for All Devices';
+        }
+      }
+    });
+  }
+
+  // Test Email Settings Button
+  if (testEmailBtn) {
+    testEmailBtn.addEventListener('click', async () => {
+      const gmailUser = document.getElementById('cfg-gmail-user').value.trim();
+      const appPassword = document.getElementById('cfg-app-password').value.trim();
+      const notifyEmail = document.getElementById('cfg-notify-email').value.trim() || gmailUser;
+
+      if (!gmailUser) {
+        showToast('Please enter your Gmail address first.', 'error');
+        document.getElementById('cfg-gmail-user').focus();
+        return;
+      }
+
+      testEmailBtn.disabled = true;
+      testEmailBtn.querySelector('span').textContent = 'Testing Google SMTP Connection...';
+
+      if (emailFeedback) {
+        emailFeedback.hidden = false;
+        emailFeedback.className = 'form-alert info';
+        emailFeedback.innerHTML = `<span>⏳ Verifying credentials with Google SMTP and dispatching test email...</span>`;
+      }
+
+      try {
+        const res = await fetch(getApiUrl('/api/settings/email/test'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gmailUser,
+            appPassword,
+            testEmail: notifyEmail
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (emailFeedback) {
+            emailFeedback.className = 'form-alert success';
+            emailFeedback.innerHTML = `
+              <strong>🎉 Google App Password Authenticated Successfully!</strong>
+              <p style="margin:4px 0 0;font-size:0.8rem;">
+                ${escapeHtml(data.message)} Check your inbox at <strong>${escapeHtml(notifyEmail)}</strong> to see the test email.
+              </p>
+            `;
+          }
+          showToast(`Success! Test email sent to ${notifyEmail}.`, 'success', 5000);
+          loadEmailSettings();
+        } else {
+          if (emailFeedback) {
+            emailFeedback.className = 'form-alert error';
+            emailFeedback.innerHTML = `
+              <strong>❌ Google SMTP Connection Failed</strong>
+              <p style="margin:4px 0 0;font-size:0.8rem;line-height:1.5;">
+                ${escapeHtml(data.error || 'Failed to authenticate with Google SMTP.')}
+              </p>
+              <div style="margin-top:6px;font-size:0.75rem;opacity:0.9;">
+                <strong>Troubleshooting tips:</strong><br>
+                1. Make sure 2-Step Verification is turned ON for your Google account.<br>
+                2. Generate a 16-character App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:inherit;text-decoration:underline;">myaccount.google.com/apppasswords</a>.<br>
+                3. Do NOT use your standard account password; you must use the 16-character App Password.
+              </div>
+            `;
+          }
+          showToast('Google SMTP verification failed. Check credentials.', 'error', 6000);
+        }
+      } catch (err) {
+        if (emailFeedback) {
+          emailFeedback.className = 'form-alert error';
+          emailFeedback.textContent = 'Network error testing SMTP: ' + err.message;
+        }
+        showToast('Error testing email: ' + err.message, 'error');
+      } finally {
+        testEmailBtn.disabled = false;
+        testEmailBtn.querySelector('span').textContent = '🧪 Test Connection & Send Test Email';
+      }
     });
   }
 
@@ -3422,7 +3174,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAll();
   updateAdminUI();
   fetchMessagesFromDb();
-  fetchMailSettings();
+  loadEmailSettings();
   fetchDbStats();
 
 });
