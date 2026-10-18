@@ -54,17 +54,82 @@ document.addEventListener('DOMContentLoaded', () => {
   const STORAGE_KEY = 'keerthan_portfolio_data';
   const AUTH_KEY = 'keerthan_admin_session';
   const PASSWORD_HASH_KEY = 'keerthan_admin_hash';
-  // Default hash for 'admin123'
-  const DEFAULT_HASH = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9';
+  // Default hash for 'Keerthan@2024'
+  const DEFAULT_HASH = 'ae0d4efe0967ec0418278cd1773114afc8c546489c092e6ccfe99216eb0ef4a4';
 
   let portfolioData = null;
   let isEditModeActive = false;
+
+  // Resolve backend API URL (handles cross-origin if loaded via Live Server port 5500, file://, or port 3000)
+  const getApiUrl = (endpoint) => {
+    if (window.location.protocol === 'file:') {
+      return `http://localhost:3000${endpoint}`;
+    }
+    if (window.location.protocol.startsWith('http') && 
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && 
+        window.location.port !== '3000') {
+      return `http://${window.location.hostname}:3000${endpoint}`;
+    }
+    return endpoint;
+  };
+
+  // Safe JSON API fetch helper: avoids SyntaxError: Unexpected token '<' on non-JSON / HTML / offline responses
+  const safeFetchJson = async (url, options = {}) => {
+    try {
+      const res = await fetch(url, options);
+      const contentType = (res.headers && res.headers.get('content-type')) || '';
+      let data = null;
+      if (contentType.includes('application/json')) {
+        try {
+          data = await res.json();
+        } catch (e) {
+          data = null;
+        }
+      } else {
+        const text = await res.text();
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = null;
+        }
+      }
+      return {
+        ok: res.ok,
+        status: res.status,
+        data: data,
+        isHtml: !contentType.includes('application/json') && data === null
+      };
+    } catch (netErr) {
+      return {
+        ok: false,
+        status: 0,
+        data: null,
+        error: netErr.message,
+        isNetworkError: true
+      };
+    }
+  };
 
   const loadPortfolioData = () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         portfolioData = JSON.parse(stored);
+        // Self-heal stale or broken avatar references from older browser caches
+        if (!portfolioData.profile) portfolioData.profile = {};
+        if (!portfolioData.profile.avatar || portfolioData.profile.avatar.includes('profile-photo.jpg')) {
+          if (defaultPortfolioData && defaultPortfolioData.profile && defaultPortfolioData.profile.avatar) {
+            portfolioData.profile.avatar = defaultPortfolioData.profile.avatar;
+          }
+        }
+        // Ensure certifications array exists and is populated
+        if (!portfolioData.certifications || !Array.isArray(portfolioData.certifications) || portfolioData.certifications.length === 0) {
+          if (defaultPortfolioData && defaultPortfolioData.certifications) {
+            portfolioData.certifications = JSON.parse(JSON.stringify(defaultPortfolioData.certifications));
+          } else {
+            portfolioData.certifications = [];
+          }
+        }
       } else {
         portfolioData = JSON.parse(JSON.stringify(defaultPortfolioData));
       }
@@ -73,15 +138,23 @@ document.addEventListener('DOMContentLoaded', () => {
       portfolioData = JSON.parse(JSON.stringify(defaultPortfolioData));
     }
 
-    // Optional server sync if running via node server.js
+    // Server sync: always retrieve latest saved database content so all visitors see latest edits
     if (window.location.protocol.startsWith('http')) {
-      fetch('/api/portfolio-data')
+      fetch(getApiUrl('/api/portfolio-data'))
         .then(res => res.ok ? res.json() : null)
         .then(serverData => {
           if (serverData && serverData.profile) {
             portfolioData = serverData;
+            if (!portfolioData.certifications || !Array.isArray(portfolioData.certifications) || portfolioData.certifications.length === 0) {
+              if (defaultPortfolioData && defaultPortfolioData.certifications) {
+                portfolioData.certifications = JSON.parse(JSON.stringify(defaultPortfolioData.certifications));
+              }
+            }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolioData));
             renderAll();
+            if (typeof populateCmsFields === 'function') {
+              populateCmsFields();
+            }
           }
         })
         .catch(() => {
@@ -97,13 +170,20 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Changes saved to browser storage!', 'success');
       }
 
-      // If running via node server.js, also persist to data.json on disk
+      // If running via node server.js (or reachable on port 3000), persist to SQLite database and data.js on disk
       if (window.location.protocol.startsWith('http')) {
-        fetch('/api/portfolio-data', {
+        fetch(getApiUrl('/api/portfolio-data'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(portfolioData)
-        }).catch(() => {});
+        })
+        .then(res => res.ok ? res.json() : null)
+        .then(resData => {
+          if (resData && !silent) {
+            showToast('Synchronized with database & disk for all visitors!', 'success');
+          }
+        })
+        .catch(() => {});
       }
     } catch (e) {
       console.error('Error saving portfolio data:', e);
@@ -124,6 +204,45 @@ document.addEventListener('DOMContentLoaded', () => {
       current = current[parts[i]];
     }
     current[parts[parts.length - 1]] = value;
+  };
+
+  // Helper to safely convert base64 data URLs to a Blob for reliable PDF iframe and download handling
+  const dataUrlToBlob = (dataUrl) => {
+    try {
+      const arr = dataUrl.split(',');
+      if (arr.length < 2) return null;
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
+    } catch (e) {
+      console.warn('dataUrlToBlob conversion failed:', e);
+      return null;
+    }
+  };
+
+  // Helper to determine if a URL, data URI, or cert object represents a PDF
+  const isPdfDocument = (url, certObj = null) => {
+    if (!url) return false;
+    const lower = url.toLowerCase();
+    if (lower.includes('.pdf') || lower.startsWith('data:application/pdf') || lower.includes('application/pdf')) {
+      return true;
+    }
+    if (certObj && certObj.fileType && certObj.fileType.includes('pdf')) {
+      return true;
+    }
+    if (certObj && certObj.fileName && certObj.fileName.toLowerCase().endsWith('.pdf')) {
+      return true;
+    }
+    if (lower.startsWith('data:') && (lower.includes('base64,jvber') || lower.includes('application/octet-stream'))) {
+      return true;
+    }
+    return false;
   };
 
 
@@ -186,15 +305,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const avatarGraphic = document.getElementById('profile-avatar-graphic');
 
     if (avatarImg && avatarSvg) {
+      if (!avatarImg.dataset.bound) {
+        avatarImg.dataset.bound = 'true';
+        avatarImg.addEventListener('load', () => {
+          avatarImg.style.display = 'block';
+          if (avatarSvg) avatarSvg.style.display = 'none';
+          if (avatarGraphic) avatarGraphic.classList.add('has-image');
+        });
+        avatarImg.addEventListener('error', () => {
+          if (!avatarImg.dataset.triedFallback) {
+            avatarImg.dataset.triedFallback = 'true';
+            // Attempt fallback to canonical keerthan-photo.jpg
+            if (!avatarImg.src.includes('keerthan-photo.jpg')) {
+              avatarImg.src = 'Assets/keerthan-photo.jpg';
+              return;
+            }
+          }
+          avatarImg.style.display = 'none';
+          if (avatarSvg) avatarSvg.style.display = 'block';
+          if (avatarGraphic) avatarGraphic.classList.remove('has-image');
+        });
+      }
+
       if (p.avatar && p.avatar.trim() !== '') {
-        avatarImg.src = p.avatar;
+        const cleanAvatar = p.avatar.trim();
+        if (avatarImg.getAttribute('src') !== cleanAvatar) {
+          avatarImg.src = cleanAvatar;
+        }
         avatarImg.style.display = 'block';
         avatarSvg.style.display = 'none';
         if (avatarGraphic) avatarGraphic.classList.add('has-image');
       } else {
-        avatarImg.style.display = 'none';
-        avatarSvg.style.display = 'block';
-        if (avatarGraphic) avatarGraphic.classList.remove('has-image');
+        avatarImg.src = 'Assets/keerthan-photo.jpg';
+        avatarImg.style.display = 'block';
+        avatarSvg.style.display = 'none';
+        if (avatarGraphic) avatarGraphic.classList.add('has-image');
       }
     }
 
@@ -408,24 +553,56 @@ document.addEventListener('DOMContentLoaded', () => {
     if (portfolioData.certifications && portfolioData.certifications.length > 0) {
       html += `
         <div class="education-card certifications-card">
-          <div class="education-badge">Certifications</div>
+          <div class="education-badge">Certifications &amp; Credentials</div>
           <h3 class="education-degree">Industry Certifications</h3>
           <ul class="cert-list">
-            ${portfolioData.certifications.map(cert => `
-              <li class="cert-item">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                <div>
-                  <strong>${cert.title}</strong>
-                  <span class="cert-meta">${cert.org} (${cert.year})</span>
+            ${portfolioData.certifications.map(cert => {
+              const hasFile = cert.fileUrl && cert.fileUrl.trim();
+              const isPdf = hasFile && isPdfDocument(cert.fileUrl, cert);
+              const badgeHtml = hasFile
+                ? `<span class="cert-attached-badge">📄 ${isPdf ? 'PDF Document' : 'Attached File'}</span>`
+                : `<span class="cert-attached-badge" style="background:rgba(245,158,11,0.12);color:var(--status-warning);border-color:rgba(245,158,11,0.25);">⭐ Verified Credential</span>`;
+
+              return `
+              <li class="cert-item" data-cert-id="${cert.id}" onclick="window.openCertPreview('${cert.id}')" tabindex="0" role="button" aria-label="View ${cert.title} Certificate">
+                <div class="cert-item-main">
+                  <svg class="cert-check-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                  <div class="cert-info">
+                    <strong class="cert-title">${cert.title}</strong>
+                    <div class="cert-meta">
+                      <span>${cert.org} (${cert.year})</span>
+                      ${badgeHtml}
+                    </div>
+                  </div>
+                </div>
+                <div class="cert-item-actions">
+                  <button type="button" class="btn btn-sm btn-outline cert-view-btn" onclick="event.stopPropagation(); window.openCertPreview('${cert.id}')" title="View Certificate Document">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <span>View Certificate</span>
+                  </button>
                 </div>
               </li>
-            `).join('')}
+              `;
+            }).join('')}
           </ul>
         </div>
       `;
     }
 
     container.innerHTML = html;
+
+    // Attach keyboard handlers to certificate items for accessibility
+    container.querySelectorAll('.cert-item').forEach(item => {
+      const certId = item.getAttribute('data-cert-id');
+      if (!certId) return;
+
+      item.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          window.openCertPreview(certId);
+        }
+      });
+    });
   };
 
   // Master Render Function
@@ -454,6 +631,102 @@ document.addEventListener('DOMContentLoaded', () => {
   const editModeStatus = document.getElementById('edit-mode-status');
 
   const ADMIN_DEVICE_KEY = 'portfolio_admin_device_authorized';
+  const ADMIN_TIMEOUT_SECONDS = 20;
+  let adminLoginTimerInterval = null;
+  let adminLoginSecondsRemaining = ADMIN_TIMEOUT_SECONDS;
+
+  const adminTimerWrap = document.getElementById('admin-login-timer-wrap');
+  const adminTimerCountdown = document.getElementById('admin-timer-countdown');
+  const adminTimerProgress = document.getElementById('admin-timer-progress');
+  const adminBtnTimerBadge = document.getElementById('admin-btn-timer-badge');
+
+  const updateTimerDisplay = (seconds) => {
+    if (adminTimerCountdown) {
+      adminTimerCountdown.textContent = `${seconds}s`;
+    }
+    if (adminTimerProgress) {
+      const pct = Math.max(0, (seconds / ADMIN_TIMEOUT_SECONDS) * 100);
+      adminTimerProgress.style.width = `${pct}%`;
+    }
+    if (adminTimerWrap) {
+      if (seconds <= 5) {
+        adminTimerWrap.classList.add('urgent');
+      } else {
+        adminTimerWrap.classList.remove('urgent');
+      }
+    }
+    if (adminBtnTimerBadge) {
+      adminBtnTimerBadge.textContent = `${seconds}s`;
+      if (!isUserAuthenticated() && adminTriggerBtn && adminTriggerBtn.style.display !== 'none' && !adminTriggerBtn.classList.contains('admin-hidden')) {
+        adminBtnTimerBadge.style.display = 'inline-block';
+      } else {
+        adminBtnTimerBadge.style.display = 'none';
+      }
+    }
+  };
+
+  const stopAdminLoginTimer = () => {
+    if (adminLoginTimerInterval) {
+      clearInterval(adminLoginTimerInterval);
+      adminLoginTimerInterval = null;
+    }
+    if (adminBtnTimerBadge) {
+      adminBtnTimerBadge.style.display = 'none';
+    }
+    if (adminTimerWrap) {
+      adminTimerWrap.classList.remove('urgent');
+    }
+  };
+
+  const startAdminLoginTimer = () => {
+    stopAdminLoginTimer();
+    adminLoginSecondsRemaining = ADMIN_TIMEOUT_SECONDS;
+    updateTimerDisplay(adminLoginSecondsRemaining);
+
+    adminLoginTimerInterval = setInterval(() => {
+      if (isUserAuthenticated()) {
+        stopAdminLoginTimer();
+        return;
+      }
+
+      adminLoginSecondsRemaining--;
+      updateTimerDisplay(adminLoginSecondsRemaining);
+
+      if (adminLoginSecondsRemaining <= 0) {
+        stopAdminLoginTimer();
+        closeModal(adminLoginModal);
+        if (adminLoginForm) adminLoginForm.reset();
+        if (loginErrorMsg) loginErrorMsg.textContent = '';
+
+        if (!isUserAuthenticated()) {
+          localStorage.removeItem(ADMIN_DEVICE_KEY);
+          if (adminTriggerBtn) {
+            adminTriggerBtn.classList.add('admin-hidden');
+            adminTriggerBtn.style.display = 'none';
+          }
+          if (adminBtnTimerBadge) {
+            adminBtnTimerBadge.style.display = 'none';
+          }
+          updateAdminUI();
+          showToast('⏱️ Admin login window timed out (20s limit). Admin option locked.', 'error', 4500);
+        }
+      }
+    }, 1000);
+  };
+
+  const openAdminLoginModalWithTimer = () => {
+    if (isUserAuthenticated()) {
+      openModal(document.getElementById('admin-cms-modal'));
+      populateCmsFields();
+      return;
+    }
+
+    if (adminLoginForm) adminLoginForm.reset();
+    if (loginErrorMsg) loginErrorMsg.textContent = '';
+    openModal(adminLoginModal);
+    startAdminLoginTimer();
+    setTimeout(() => adminPasswordInput && adminPasswordInput.focus(), 150);
+  };
 
   // Compute SHA-256 hex string using browser-native subtle crypto
   const sha256 = async (message) => {
@@ -464,7 +737,13 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const getStoredHash = () => {
-    return localStorage.getItem(PASSWORD_HASH_KEY) || DEFAULT_HASH;
+    const stored = localStorage.getItem(PASSWORD_HASH_KEY);
+    // Automatically migrate from old default 'admin123' hash if present in browser storage
+    if (!stored || stored === '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9') {
+      localStorage.setItem(PASSWORD_HASH_KEY, DEFAULT_HASH);
+      return DEFAULT_HASH;
+    }
+    return stored;
   };
 
   const setStoredHash = (newHash) => {
@@ -520,6 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
         adminTriggerBtn.style.display = 'inline-flex';
         adminTriggerBtn.classList.add('active');
         adminTriggerBtn.title = 'Admin Active (Click for CMS Dashboard)';
+        if (adminBtnTimerBadge) adminBtnTimerBadge.style.display = 'none';
       } else if (isAuthDevice) {
         adminTriggerBtn.classList.remove('admin-hidden');
         adminTriggerBtn.style.display = 'inline-flex';
@@ -528,6 +808,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         adminTriggerBtn.classList.add('admin-hidden');
         adminTriggerBtn.style.display = 'none';
+        if (adminBtnTimerBadge) adminBtnTimerBadge.style.display = 'none';
       }
     }
 
@@ -546,18 +827,47 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginAdmin = async (password) => {
     if (!password) return;
     const computedHash = await sha256(password);
-    const currentHash = getStoredHash();
+    let isAuthenticated = false;
 
-    if (computedHash === currentHash) {
+    // 1. Authenticate against central SQLite database or Netlify function (works across all devices)
+    try {
+      const res = await safeFetchJson(getApiUrl('/api/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hash: computedHash })
+      });
+      if (res.ok && res.data && res.data.authenticated === true) {
+        isAuthenticated = true;
+        setStoredHash(computedHash);
+      }
+    } catch (e) {
+      console.warn('Backend login endpoint unreachable, checking local hash cache:', e);
+    }
+
+    // 2. Fallback to cached local hash if offline / static
+    if (!isAuthenticated) {
+      const currentHash = getStoredHash();
+      if (computedHash === currentHash) {
+        isAuthenticated = true;
+      }
+    }
+
+    if (isAuthenticated) {
+      stopAdminLoginTimer();
       sessionStorage.setItem(AUTH_KEY, 'true');
       localStorage.setItem(ADMIN_DEVICE_KEY, 'true'); // Authorize device upon login
       if (loginErrorMsg) loginErrorMsg.textContent = '';
       closeModal(adminLoginModal);
       if (adminLoginForm) adminLoginForm.reset();
       updateAdminUI();
-      // Automatically turn on edit mode for convenient in-place editing
+      // Automatically turn on edit mode and open CMS Dashboard
       setEditMode(true);
-      showToast('Authenticated as Admin! Visual Edit Mode is now ON.', 'success');
+      fetchMessagesFromDb();
+      loadEmailSettings();
+      fetchDbStats();
+      openModal(document.getElementById('admin-cms-modal'));
+      populateCmsFields();
+      showToast('Authenticated as Admin! CMS Dashboard opened.', 'success');
     } else {
       if (loginErrorMsg) {
         loginErrorMsg.textContent = 'Incorrect admin password.';
@@ -567,7 +877,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const logoutAdmin = () => {
+    stopAdminLoginTimer();
     sessionStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(ADMIN_DEVICE_KEY);
     setEditMode(false);
     updateAdminUI();
     showToast('Logged out from admin session.', 'info');
@@ -586,10 +898,9 @@ document.addEventListener('DOMContentLoaded', () => {
           openModal(document.getElementById('admin-cms-modal'));
           populateCmsFields();
         } else {
-          openModal(adminLoginModal);
-          setTimeout(() => adminPasswordInput && adminPasswordInput.focus(), 150);
+          openAdminLoginModalWithTimer();
         }
-        showToast('🔒 Admin gateway unlocked for this device.', 'info', 2500);
+        showToast('🔒 Admin gateway unlocked (20s login timer active).', 'info', 2500);
       }, 350);
 
       // Clean address bar so the query string doesn't remain visible
@@ -623,10 +934,9 @@ document.addEventListener('DOMContentLoaded', () => {
           openModal(document.getElementById('admin-cms-modal'));
           populateCmsFields();
         } else {
-          openModal(adminLoginModal);
-          setTimeout(() => adminPasswordInput && adminPasswordInput.focus(), 150);
+          openAdminLoginModalWithTimer();
         }
-        showToast('🔒 Admin gateway unlocked.', 'info', 2500);
+        showToast('🔒 Admin gateway unlocked (20s login timer active).', 'info', 2500);
       }
     };
 
@@ -644,10 +954,9 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal(document.getElementById('admin-cms-modal'));
         populateCmsFields();
       } else {
-        openModal(adminLoginModal);
-        setTimeout(() => adminPasswordInput && adminPasswordInput.focus(), 150);
+        openAdminLoginModalWithTimer();
       }
-      showToast('🔒 Admin gateway opened.', 'info', 2000);
+      showToast('🔒 Admin gateway opened (20s login timer active).', 'info', 2000);
     }
   });
 
@@ -658,8 +967,19 @@ document.addEventListener('DOMContentLoaded', () => {
         openModal(document.getElementById('admin-cms-modal'));
         populateCmsFields();
       } else {
-        openModal(adminLoginModal);
-        setTimeout(() => adminPasswordInput && adminPasswordInput.focus(), 150);
+        openAdminLoginModalWithTimer();
+      }
+    });
+  }
+
+  const footerAdminBtn = document.getElementById('footer-admin-btn');
+  if (footerAdminBtn) {
+    footerAdminBtn.addEventListener('click', () => {
+      if (isUserAuthenticated()) {
+        openModal(document.getElementById('admin-cms-modal'));
+        populateCmsFields();
+      } else {
+        openAdminLoginModalWithTimer();
       }
     });
   }
@@ -794,6 +1114,9 @@ document.addEventListener('DOMContentLoaded', () => {
     openCmsBtn.addEventListener('click', () => {
       openModal(cmsModal);
       populateCmsFields();
+      fetchMessagesFromDb();
+      loadEmailSettings();
+      fetchDbStats();
     });
   }
 
@@ -804,8 +1127,17 @@ document.addEventListener('DOMContentLoaded', () => {
       tabPanes.forEach(p => p.classList.remove('active'));
 
       btn.classList.add('active');
-      const targetPane = document.getElementById(btn.getAttribute('data-tab'));
+      const tabId = btn.getAttribute('data-tab');
+      const targetPane = document.getElementById(tabId);
       if (targetPane) targetPane.classList.add('active');
+
+      if (tabId === 'tab-messages') {
+        fetchMessagesFromDb();
+      } else if (tabId === 'tab-email-settings') {
+        loadEmailSettings();
+      } else if (tabId === 'tab-database') {
+        fetchDbStats();
+      }
     });
   });
 
@@ -889,6 +1221,36 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
       `).join('');
+    }
+
+    // Populate Certifications in CMS
+    const certCountSpan = document.getElementById('cms-cert-count');
+    if (certCountSpan) {
+      certCountSpan.textContent = (portfolioData.certifications || []).length;
+    }
+
+    const certList = document.getElementById('cms-cert-list');
+    if (certList && portfolioData.certifications) {
+      if (portfolioData.certifications.length === 0) {
+        certList.innerHTML = '<div class="empty-state">No certifications added yet. Click "+ Add Certification" to create one.</div>';
+      } else {
+        certList.innerHTML = portfolioData.certifications.map(cert => `
+          <div class="cms-item-row" data-cert-id="${cert.id}">
+            <div class="cms-item-info">
+              <span class="cms-item-title">${cert.title}</span>
+              <span class="cms-item-sub">
+                ${cert.org} (${cert.year}) 
+                ${cert.fileUrl ? '&bull; <span class="cert-file-badge">📄 Attached</span>' : '&bull; <span class="cert-file-badge badge-none">Digital Parchment</span>'}
+              </span>
+            </div>
+            <div class="cms-item-actions">
+              <button class="btn btn-sm btn-outline" onclick="window.openCertPreview('${cert.id}')">Preview</button>
+              <button class="btn btn-sm btn-secondary" onclick="window.editCertification('${cert.id}')">Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="window.deleteCertification('${cert.id}')">Delete</button>
+            </div>
+          </div>
+        `).join('');
+      }
     }
 
     // Refresh database messages and diagnostics
@@ -979,10 +1341,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const { dataUrl, filename } = await processAndOptimizeImage(file);
 
       let finalAvatarUrl = dataUrl;
+      let serverSaved = false;
+
       // Try to save to server if online
       if (window.location.protocol.startsWith('http')) {
         try {
-          const res = await fetch('/api/upload-photo', {
+          const res = await fetch(getApiUrl('/api/upload-photo'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ photoBase64: dataUrl, filename })
@@ -991,6 +1355,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const json = await res.json();
             if (json.photoUrl) {
               finalAvatarUrl = json.photoUrl;
+              serverSaved = true;
             }
           }
         } catch (e) {
@@ -1001,9 +1366,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!portfolioData.profile) portfolioData.profile = {};
       portfolioData.profile.avatar = finalAvatarUrl;
       updateCmsPhotoPreview(finalAvatarUrl);
-      savePortfolioData();
+      savePortfolioData(true);
       renderAll();
-      showToast('Profile photo updated successfully!', 'success');
+
+      if (serverSaved) {
+        showToast('Profile photo saved to backend & visible for all visitors!', 'success', 3500);
+      } else {
+        showToast('Saved to browser preview. (To publish permanently for all Netlify visitors, push your committed photo to Git)', 'info', 5000);
+      }
     } catch (err) {
       showToast(err.message || 'Error uploading photo', 'error');
     }
@@ -1143,7 +1513,6 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Role deleted successfully.', 'info');
   };
 
-  const addExpBtn = document.getElementById('add-experience-btn');
   const cmsAddExpBtn = document.getElementById('cms-add-exp-btn');
   const openNewExpModal = () => {
     if (expForm) expForm.reset();
@@ -1151,7 +1520,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('exp-modal-title').textContent = 'Add New Work Experience';
     openModal(expModal);
   };
-  if (addExpBtn) addExpBtn.addEventListener('click', openNewExpModal);
   if (cmsAddExpBtn) cmsAddExpBtn.addEventListener('click', openNewExpModal);
 
   if (expForm) {
@@ -1221,7 +1589,6 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Project deleted successfully.', 'info');
   };
 
-  const addProjBtn = document.getElementById('add-project-btn');
   const cmsAddProjBtn = document.getElementById('cms-add-proj-btn');
   const openNewProjModal = () => {
     if (projForm) projForm.reset();
@@ -1229,7 +1596,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('proj-modal-title').textContent = 'Add New Project';
     openModal(projModal);
   };
-  if (addProjBtn) addProjBtn.addEventListener('click', openNewProjModal);
   if (cmsAddProjBtn) cmsAddProjBtn.addEventListener('click', openNewProjModal);
 
   if (projForm) {
@@ -1315,6 +1681,550 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* --------------------------------------------------------------------------
+     7b. CERTIFICATIONS CMS MANAGEMENT & MODAL CONTROLLER
+     -------------------------------------------------------------------------- */
+  const certModal = document.getElementById('cert-edit-modal');
+  const certForm = document.getElementById('cert-edit-form');
+  const cmsAddCertBtn = document.getElementById('cms-add-cert-btn');
+  const certFileInput = document.getElementById('cert-file-input');
+  const certUploadBtn = document.getElementById('cert-upload-btn');
+  const certRemoveFileBtn = document.getElementById('cert-remove-file-btn');
+  const certFileStatusText = document.getElementById('cert-file-status-text');
+  const certFileUrlInput = document.getElementById('cert-file-url');
+
+  // State tracking for selected certificate file metadata and active Blob URLs
+  let currentCertFileName = '';
+  let currentCertFileType = '';
+  let currentPreviewBlobUrl = null;
+  let currentCertBlobUrl = null;
+
+  // Live Inline Preview inside CMS Edit Modal
+  const updateCertModalPreview = (fileUrl, customFileName = '') => {
+    const previewContainer = document.getElementById('cert-upload-preview-container');
+    const previewWrap = document.getElementById('cert-inline-preview-wrap');
+    const previewBadge = document.getElementById('cert-preview-badge');
+    const openLink = document.getElementById('cert-preview-open-link');
+    const testModalBtn = document.getElementById('cert-preview-test-modal');
+
+    if (!previewContainer || !previewWrap) return;
+
+    if (!fileUrl || !fileUrl.trim()) {
+      previewContainer.style.display = 'none';
+      previewWrap.innerHTML = '';
+      if (currentPreviewBlobUrl) {
+        URL.revokeObjectURL(currentPreviewBlobUrl);
+        currentPreviewBlobUrl = null;
+      }
+      return;
+    }
+
+    const rawUrl = fileUrl.replace(/\\/g, '/').trim();
+    const cleanUrl = (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:') || rawUrl.startsWith('/')) 
+      ? rawUrl 
+      : '/' + rawUrl;
+
+    const isPdf = isPdfDocument(cleanUrl);
+    let viewUrl = cleanUrl;
+
+    if (currentPreviewBlobUrl) {
+      URL.revokeObjectURL(currentPreviewBlobUrl);
+      currentPreviewBlobUrl = null;
+    }
+
+    if (cleanUrl.startsWith('data:') && isPdf) {
+      const blob = dataUrlToBlob(cleanUrl);
+      if (blob) {
+        currentPreviewBlobUrl = URL.createObjectURL(blob);
+        viewUrl = currentPreviewBlobUrl;
+      }
+    }
+
+    let displayFileName = customFileName;
+    if (!displayFileName) {
+      if (cleanUrl.startsWith('data:')) {
+        displayFileName = isPdf ? 'Uploaded_Document.pdf' : 'Uploaded_Image.png';
+      } else {
+        displayFileName = cleanUrl.split('/').pop().split('?')[0];
+      }
+    }
+
+    previewContainer.style.display = 'flex';
+    if (previewBadge) {
+      previewBadge.innerHTML = isPdf ? `📄 PDF Document: ${displayFileName}` : `🖼️ Image Document: ${displayFileName}`;
+    }
+    if (openLink) {
+      openLink.href = viewUrl;
+    }
+    if (testModalBtn) {
+      testModalBtn.onclick = () => {
+        const tempCertId = document.getElementById('cert-id').value;
+        if (tempCertId) {
+          window.openCertPreview(tempCertId);
+        } else {
+          window.open(viewUrl, '_blank');
+        }
+      };
+    }
+
+    if (isPdf) {
+      previewWrap.innerHTML = `
+        <iframe src="${viewUrl}#toolbar=0&navpanes=0" class="cms-cert-preview-frame" title="Certificate Document Preview"></iframe>
+      `;
+    } else {
+      previewWrap.innerHTML = `
+        <img src="${cleanUrl}" alt="Certificate Document Preview" class="cms-cert-preview-img" loading="lazy">
+      `;
+    }
+  };
+
+  window.editCertification = (id) => {
+    if (!portfolioData.certifications) portfolioData.certifications = [];
+    const cert = portfolioData.certifications.find(c => c.id === id);
+    if (!cert) return;
+
+    currentCertFileName = cert.fileName || '';
+    currentCertFileType = cert.fileType || '';
+
+    document.getElementById('cert-id').value = cert.id;
+    document.getElementById('cert-title').value = cert.title || '';
+    document.getElementById('cert-org').value = cert.org || '';
+    document.getElementById('cert-year').value = cert.year || '';
+    document.getElementById('cert-desc').value = cert.desc || '';
+    document.getElementById('cert-credential-url').value = cert.credentialUrl || '';
+    if (certFileUrlInput) certFileUrlInput.value = cert.fileUrl || '';
+    document.getElementById('cert-modal-title').textContent = 'Edit Certification';
+
+    if (cert.fileUrl && cert.fileUrl.trim()) {
+      const isPdf = isPdfDocument(cert.fileUrl, cert);
+      const displayFileName = cert.fileName || (cert.fileUrl.startsWith('data:') 
+        ? (isPdf ? 'Certificate_Document.pdf' : 'Certificate_Image.png') 
+        : cert.fileUrl.replace(/\\/g, '/').split('/').pop().split('?')[0]);
+
+      if (certFileStatusText) {
+        certFileStatusText.innerHTML = `<span class="cert-file-badge">📄 Document Attached: ${displayFileName}</span>`;
+      }
+      if (certRemoveFileBtn) certRemoveFileBtn.style.display = 'inline-block';
+      updateCertModalPreview(cert.fileUrl, displayFileName);
+    } else {
+      if (certFileStatusText) {
+        certFileStatusText.textContent = 'No document attached yet (Digital credential preview will be generated).';
+      }
+      if (certRemoveFileBtn) certRemoveFileBtn.style.display = 'none';
+      updateCertModalPreview('');
+    }
+
+    openModal(certModal);
+  };
+
+  window.deleteCertification = (id) => {
+    if (!confirm('Are you sure you want to delete this certification?')) return;
+    portfolioData.certifications = (portfolioData.certifications || []).filter(c => c.id !== id);
+    savePortfolioData();
+    renderEducation();
+    populateCmsFields();
+    showToast('Certification deleted successfully.', 'info');
+  };
+
+  const openNewCertModal = () => {
+    currentCertFileName = '';
+    currentCertFileType = '';
+    if (certForm) certForm.reset();
+    document.getElementById('cert-id').value = '';
+    document.getElementById('cert-modal-title').textContent = 'Add New Certification';
+    if (certFileUrlInput) certFileUrlInput.value = '';
+    if (certFileStatusText) {
+      certFileStatusText.textContent = 'No document attached yet (Digital credential preview will be generated).';
+    }
+    if (certRemoveFileBtn) certRemoveFileBtn.style.display = 'none';
+    updateCertModalPreview('');
+    openModal(certModal);
+  };
+  if (cmsAddCertBtn) cmsAddCertBtn.addEventListener('click', openNewCertModal);
+
+  // Certificate Document Upload & Attachment Handlers
+  if (certUploadBtn && certFileInput) {
+    certUploadBtn.addEventListener('click', () => {
+      certFileInput.click();
+    });
+
+    certFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      currentCertFileName = file.name;
+      currentCertFileType = file.type;
+
+      if (certFileStatusText) {
+        certFileStatusText.textContent = `Uploading ${file.name}...`;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        const base64Data = evt.target.result;
+
+        // Try server upload API if on HTTP protocol
+        if (window.location.protocol.startsWith('http')) {
+          try {
+            const res = await fetch(getApiUrl('/api/upload-certificate'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fileBase64: base64Data,
+                filename: file.name
+              })
+            });
+
+            if (res.ok) {
+              const result = await res.json();
+              if (certFileUrlInput) certFileUrlInput.value = result.fileUrl;
+              if (certFileStatusText) {
+                certFileStatusText.innerHTML = `<span class="cert-file-badge">✓ Document Uploaded: ${result.filename || file.name}</span>`;
+              }
+              if (certRemoveFileBtn) certRemoveFileBtn.style.display = 'inline-block';
+              updateCertModalPreview(result.fileUrl, result.filename || file.name);
+              showToast('Certificate document uploaded successfully!', 'success');
+              return;
+            }
+          } catch (uploadErr) {
+            console.warn('Server upload failed, falling back to local data URL:', uploadErr);
+          }
+        }
+
+        // Fallback: embed base64 directly (e.g. static hosting on Netlify)
+        if (certFileUrlInput) certFileUrlInput.value = base64Data;
+        if (certFileStatusText) {
+          certFileStatusText.innerHTML = `<span class="cert-file-badge">✓ Document Attached: ${file.name}</span>`;
+        }
+        if (certRemoveFileBtn) certRemoveFileBtn.style.display = 'inline-block';
+        updateCertModalPreview(base64Data, file.name);
+        showToast('Certificate attached to browser preview! (Push your committed repo to GitHub for permanent Netlify hosting)', 'info', 6000);
+      };
+
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (certRemoveFileBtn) {
+    certRemoveFileBtn.addEventListener('click', () => {
+      currentCertFileName = '';
+      currentCertFileType = '';
+      if (certFileInput) certFileInput.value = '';
+      if (certFileUrlInput) certFileUrlInput.value = '';
+      if (certFileStatusText) {
+        certFileStatusText.textContent = 'No document attached yet (Digital credential preview will be generated).';
+      }
+      certRemoveFileBtn.style.display = 'none';
+      updateCertModalPreview('');
+      showToast('Attached certificate document removed.', 'info');
+    });
+  }
+
+  if (certFileUrlInput) {
+    certFileUrlInput.addEventListener('input', () => {
+      updateCertModalPreview(certFileUrlInput.value);
+    });
+  }
+
+  if (certForm) {
+    certForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('cert-id').value;
+      const title = document.getElementById('cert-title').value.trim();
+      const org = document.getElementById('cert-org').value.trim();
+      const year = document.getElementById('cert-year').value.trim();
+      const desc = document.getElementById('cert-desc').value.trim();
+      const credentialUrl = document.getElementById('cert-credential-url').value.trim();
+      const fileUrl = certFileUrlInput ? certFileUrlInput.value.trim() : '';
+
+      if (!portfolioData.certifications) portfolioData.certifications = [];
+
+      if (id) {
+        const item = portfolioData.certifications.find(x => x.id === id);
+        if (item) {
+          item.title = title;
+          item.org = org;
+          item.year = year;
+          item.desc = desc;
+          item.credentialUrl = credentialUrl;
+          item.fileUrl = fileUrl;
+          if (currentCertFileName) item.fileName = currentCertFileName;
+          if (currentCertFileType) item.fileType = currentCertFileType;
+        }
+      } else {
+        portfolioData.certifications.push({
+          id: 'cert-' + Date.now(),
+          title,
+          org,
+          year,
+          desc,
+          credentialUrl,
+          fileUrl,
+          fileName: currentCertFileName,
+          fileType: currentCertFileType
+        });
+      }
+
+      savePortfolioData();
+      renderEducation();
+      populateCmsFields();
+      closeModal(certModal);
+      showToast('Certification successfully saved!', 'success');
+    });
+  }
+
+
+  /* --------------------------------------------------------------------------
+     7c. CERTIFICATION PREVIEW MODAL ENGINE (Digital Parchment & Document Viewer)
+     -------------------------------------------------------------------------- */
+  const certPreviewModal = document.getElementById('cert-preview-modal');
+  const certPreviewTitle = document.getElementById('cert-preview-title');
+  const certPreviewSubtitle = document.getElementById('cert-preview-subtitle');
+  const certPreviewBody = document.getElementById('cert-preview-body');
+  const certDownloadBtn = document.getElementById('cert-download-btn');
+  const certFullscreenBtn = document.getElementById('cert-fullscreen-btn');
+  const certPrintBtn = document.getElementById('cert-print-btn');
+  const certCredentialBtn = document.getElementById('cert-credential-btn');
+  const certAdminEditBtn = document.getElementById('cert-admin-edit-btn');
+
+  window.openCertPreview = (certId, forceParchment = false) => {
+    if (!portfolioData || !portfolioData.certifications) return;
+    const cert = portfolioData.certifications.find(c => c.id === certId);
+    if (!cert) return;
+
+    // Open modal FIRST so layout dimensions are active and calculated
+    openModal(certPreviewModal);
+
+    if (certPreviewTitle) certPreviewTitle.textContent = cert.title;
+    if (certPreviewSubtitle) {
+      certPreviewSubtitle.innerHTML = `${cert.org} &bull; Issued ${cert.year}`;
+    }
+
+    const hasFile = cert.fileUrl && cert.fileUrl.trim() && !forceParchment;
+    const rawUrl = (cert.fileUrl || '').replace(/\\/g, '/').trim();
+    const cleanUrl = (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:') || rawUrl.startsWith('/')) 
+      ? rawUrl 
+      : '/' + rawUrl;
+
+    const isPdf = hasFile && isPdfDocument(cleanUrl, cert);
+
+    // Clean up previous cert preview blob URL to prevent memory leaks
+    if (currentCertBlobUrl) {
+      URL.revokeObjectURL(currentCertBlobUrl);
+      currentCertBlobUrl = null;
+    }
+
+    let viewUrl = cleanUrl;
+    if (hasFile && cleanUrl.startsWith('data:') && isPdf) {
+      const blob = dataUrlToBlob(cleanUrl);
+      if (blob) {
+        currentCertBlobUrl = URL.createObjectURL(blob);
+        viewUrl = currentCertBlobUrl;
+      }
+    }
+
+    const safeName = (cert.title || 'certificate').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileExt = isPdf ? '.pdf' : (cleanUrl.toLowerCase().includes('.png') ? '.png' : '.jpg');
+    let displayFileName = '';
+    if (cert.fileName) {
+      displayFileName = cert.fileName;
+    } else if (cleanUrl.startsWith('data:')) {
+      displayFileName = `${safeName}${fileExt}`;
+    } else {
+      displayFileName = cleanUrl.split('/').pop().split('?')[0];
+    }
+
+    // Configure Toolbar Action Buttons
+    if (certDownloadBtn) {
+      if (hasFile) {
+        certDownloadBtn.style.display = 'inline-flex';
+        certDownloadBtn.href = viewUrl;
+        certDownloadBtn.setAttribute('download', `${safeName}${fileExt}`);
+        certDownloadBtn.onclick = null;
+      } else {
+        certDownloadBtn.style.display = 'inline-flex';
+        certDownloadBtn.href = '#';
+        certDownloadBtn.removeAttribute('download');
+        certDownloadBtn.onclick = (e) => {
+          e.preventDefault();
+          window.print();
+        };
+      }
+    }
+
+    if (certFullscreenBtn) {
+      if (hasFile) {
+        certFullscreenBtn.style.display = 'inline-flex';
+        certFullscreenBtn.href = viewUrl;
+        certFullscreenBtn.setAttribute('target', '_blank');
+      } else {
+        certFullscreenBtn.style.display = 'none';
+      }
+    }
+
+    if (certPrintBtn) {
+      certPrintBtn.onclick = () => {
+        window.print();
+      };
+    }
+
+    if (certCredentialBtn) {
+      if (cert.credentialUrl && cert.credentialUrl.trim()) {
+        certCredentialBtn.style.display = 'inline-flex';
+        certCredentialBtn.href = cert.credentialUrl;
+      } else {
+        certCredentialBtn.style.display = 'none';
+      }
+    }
+
+    if (certAdminEditBtn) {
+      if (typeof isUserAuthenticated === 'function' && isUserAuthenticated()) {
+        certAdminEditBtn.style.display = 'inline-flex';
+        certAdminEditBtn.onclick = () => {
+          closeModal(certPreviewModal);
+          window.editCertification(cert.id);
+        };
+      } else {
+        certAdminEditBtn.style.display = 'none';
+      }
+    }
+
+    // Render Preview Modal Content
+    if (certPreviewBody) {
+      if (hasFile) {
+        certPreviewBody.classList.add('has-doc');
+
+        if (isPdf) {
+          certPreviewBody.innerHTML = `
+            <div class="cert-doc-notice-bar">
+              <div class="doc-meta">
+                <span class="cert-file-badge">📄 Official Certificate Document (PDF)</span>
+                <span title="${displayFileName}" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${displayFileName}</span>
+              </div>
+              <div class="cert-doc-notice-actions">
+                <button type="button" class="btn btn-sm btn-outline" id="toggle-parchment-btn" title="View digital parchment credential format">
+                  📜 Digital Parchment
+                </button>
+                <a href="${viewUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline" title="Open PDF in new tab">
+                  ↗ New Tab
+                </a>
+                <a href="${viewUrl}" download="${safeName}.pdf" class="btn btn-sm btn-primary">
+                  ⬇ Download PDF
+                </a>
+              </div>
+            </div>
+            <iframe 
+              src="${viewUrl}#toolbar=1&navpanes=0&view=FitH" 
+              class="cert-pdf-frame" 
+              title="${cert.title}" 
+              loading="eager"
+              allow="fullscreen">
+            </iframe>
+          `;
+
+          const toggleBtn = certPreviewBody.querySelector('#toggle-parchment-btn');
+          if (toggleBtn) {
+            toggleBtn.onclick = () => window.openCertPreview(cert.id, true);
+          }
+        } else {
+          // Attached image document
+          certPreviewBody.innerHTML = `
+            <div class="cert-doc-notice-bar">
+              <div class="doc-meta">
+                <span class="cert-file-badge">🖼️ Official Certificate Image</span>
+                <span title="${displayFileName}">${displayFileName}</span>
+              </div>
+              <div class="cert-doc-notice-actions">
+                <button type="button" class="btn btn-sm btn-outline" id="toggle-parchment-btn" title="View digital parchment credential format">
+                  📜 Digital Parchment
+                </button>
+                <a href="${viewUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline">
+                  ↗ New Tab
+                </a>
+                <a href="${viewUrl}" download="${safeName}${fileExt}" class="btn btn-sm btn-primary">
+                  ⬇ Download Image
+                </a>
+              </div>
+            </div>
+            <div class="cert-img-wrapper">
+              <img src="${cleanUrl}" alt="${cert.title}" class="cert-preview-img" loading="eager">
+            </div>
+          `;
+
+          const toggleBtn = certPreviewBody.querySelector('#toggle-parchment-btn');
+          if (toggleBtn) {
+            toggleBtn.onclick = () => window.openCertPreview(cert.id, true);
+          }
+        }
+      } else {
+        // Authentic Digital Parchment Certificate
+        certPreviewBody.classList.remove('has-doc');
+        const recipientName = (portfolioData.profile && portfolioData.profile.name) ? portfolioData.profile.name : 'Keerthan Tunkoju';
+        const descriptionText = cert.desc || 'Demonstrating technical proficiency, professional competency, and completion of practical training curriculum.';
+        const toggleBackBtn = cert.fileUrl && cert.fileUrl.trim()
+          ? `<div style="margin-bottom:0.75rem;text-align:right;width:100%;max-width:760px;">
+               <button type="button" class="btn btn-sm btn-primary" id="toggle-doc-btn">
+                 📄 View Attached Original Document (${isPdf ? 'PDF' : 'IMAGE'})
+               </button>
+             </div>`
+          : '';
+
+        certPreviewBody.innerHTML = `
+          ${toggleBackBtn}
+          <div class="cert-paper">
+            <div class="cert-border-outer">
+              <div class="cert-border-inner">
+                <div class="cert-corner cert-corner-tl"></div>
+                <div class="cert-corner cert-corner-tr"></div>
+                <div class="cert-corner cert-corner-bl"></div>
+                <div class="cert-corner cert-corner-br"></div>
+
+                <div class="cert-emblem" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+                </div>
+
+                <div class="cert-kicker">Certificate of Recognition &amp; Achievement</div>
+                <h2 class="cert-headline">Certificate of Completion</h2>
+
+                <p class="cert-recipient-intro">This is proudly presented and awarded to</p>
+                <h3 class="cert-recipient-name">${recipientName}</h3>
+
+                <p class="cert-for-text">${descriptionText}</p>
+
+                <div class="cert-awarded-title">${cert.title}</div>
+                <div class="cert-org-line">Issued by <strong>${cert.org}</strong> &bull; Completed ${cert.year}</div>
+
+                <div class="cert-footer-row">
+                  <div class="cert-signature-block">
+                    <div class="cert-sig-line">${cert.org}</div>
+                    <div class="cert-sig-label">Authorized Authority</div>
+                  </div>
+
+                  <div class="cert-gold-seal">
+                    <span>OFFICIAL</span>
+                    <strong>VERIFIED</strong>
+                    <span>CREDENTIAL</span>
+                  </div>
+
+                  <div class="cert-signature-block">
+                    <div class="cert-sig-line">${cert.year}</div>
+                    <div class="cert-sig-label">Date Issued</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const toggleDocBtn = certPreviewBody.querySelector('#toggle-doc-btn');
+        if (toggleDocBtn) {
+          toggleDocBtn.onclick = () => window.openCertPreview(cert.id, false);
+        }
+      }
+    }
+  };
+
+
+  /* --------------------------------------------------------------------------
      8. BACKUP, EXPORT, IMPORT & RESET
      -------------------------------------------------------------------------- */
   const exportJsonBtn = document.getElementById('export-json-btn');
@@ -1334,8 +2244,23 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Downloaded portfolio-data.json backup!', 'success');
   };
 
+  const cmsExportDataJsBtn = document.getElementById('cms-export-datajs-btn');
+
+  const downloadDataJs = () => {
+    const content = `/**\n * ==========================================================================\n * KEERTHAN TUNKOJU PORTFOLIO - DEFAULT DATA STORE\n * Auto-synced with SQLite database and admin CMS updates.\n * ==========================================================================\n */\n\nconst defaultPortfolioData = ${JSON.stringify(portfolioData, null, 2)};\n\n// Export for module systems or attach to global scope\nif (typeof module !== 'undefined' && module.exports) {\n  module.exports = defaultPortfolioData;\n}\n`;
+    const dataStr = "data:text/javascript;charset=utf-8," + encodeURIComponent(content);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", "data.js");
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showToast('Downloaded data.js! Replace data.js to deploy for all visitors.', 'success', 4000);
+  };
+
   if (exportJsonBtn) exportJsonBtn.addEventListener('click', downloadJsonBackup);
   if (cmsExportBtn) cmsExportBtn.addEventListener('click', downloadJsonBackup);
+  if (cmsExportDataJsBtn) cmsExportDataJsBtn.addEventListener('click', downloadDataJs);
 
   if (cmsCopyJsonBtn) {
     cmsCopyJsonBtn.addEventListener('click', () => {
@@ -1417,15 +2342,32 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const newHash = await sha256(newPass);
+
+      // Synchronize updated password to centralized SQLite database for all devices
+      if (window.location.protocol.startsWith('http')) {
+        try {
+          const res = await fetch(getApiUrl('/api/auth/change-password'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentHash: currHash, newHash: newHash })
+          });
+          if (res.ok) {
+            console.log('✅ Admin password updated in central SQLite database.');
+          }
+        } catch (serverErr) {
+          console.warn('Backend password sync error:', serverErr);
+        }
+      }
+
       setStoredHash(newHash);
 
       if (passwordFeedback) {
         passwordFeedback.hidden = false;
         passwordFeedback.className = 'form-alert success';
-        passwordFeedback.textContent = 'Admin password updated successfully!';
+        passwordFeedback.textContent = 'Admin password updated in database across all devices!';
       }
       changePassForm.reset();
-      showToast('Admin password changed successfully!', 'success');
+      showToast('Admin password changed and saved in database!', 'success');
     });
   }
 
@@ -1443,6 +2385,28 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!modal) return;
     modal.hidden = true;
     document.body.style.overflow = '';
+
+    if (modal === certPreviewModal && currentCertBlobUrl) {
+      URL.revokeObjectURL(currentCertBlobUrl);
+      currentCertBlobUrl = null;
+    }
+    if (modal === certModal && currentPreviewBlobUrl) {
+      URL.revokeObjectURL(currentPreviewBlobUrl);
+      currentPreviewBlobUrl = null;
+    }
+
+    if (modal === adminLoginModal && !isUserAuthenticated()) {
+      stopAdminLoginTimer();
+      localStorage.removeItem(ADMIN_DEVICE_KEY);
+      if (adminTriggerBtn) {
+        adminTriggerBtn.classList.add('admin-hidden');
+        adminTriggerBtn.style.display = 'none';
+      }
+      if (adminBtnTimerBadge) {
+        adminBtnTimerBadge.style.display = 'none';
+      }
+      updateAdminUI();
+    }
   };
 
   // Close modals when clicking outside card or clicking [data-close-modal]
@@ -1595,14 +2559,12 @@ document.addEventListener('DOMContentLoaded', () => {
         message: messageInput.value.trim()
       };
 
-      // 1. Post to SQLite database on server
-      const sendPromise = window.location.protocol.startsWith('http')
-        ? fetch('/api/contact', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          }).then(res => res.json())
-        : Promise.resolve({ success: true, localOnly: true });
+      // 1. Post to SQLite database on server or Netlify Serverless Function
+      const sendPromise = safeFetchJson(getApiUrl('/api/contact'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
       sendPromise
         .then(() => {
@@ -1655,76 +2617,326 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* --------------------------------------------------------------------------
-     14. DATABASE INBOX & DIAGNOSTICS HELPERS
+     14. CENTRALIZED INBOX & GOOGLE EMAIL SETTINGS SYSTEM (SQLite Backend)
      -------------------------------------------------------------------------- */
+  let loadedInboxMessages = [];
+  let currentInboxFilter = 'all';
+  let currentInboxSearch = '';
+
+  const escapeHtml = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  const renderInboxMessages = () => {
+    const container = document.getElementById('messages-list-container');
+    if (!container) return;
+
+    let filtered = loadedInboxMessages || [];
+
+    // Filter by tab pill
+    if (currentInboxFilter === 'unread') {
+      filtered = filtered.filter(m => !m.is_read || m.is_read === 0 || m.is_read === '0');
+    } else if (currentInboxFilter === 'replied') {
+      filtered = filtered.filter(m => m.reply_sent === 1 || m.reply_sent === '1');
+    }
+
+    // Filter by keyword search
+    if (currentInboxSearch && currentInboxSearch.trim().length > 0) {
+      const q = currentInboxSearch.toLowerCase().trim();
+      filtered = filtered.filter(m =>
+        (m.name && m.name.toLowerCase().includes(q)) ||
+        (m.email && m.email.toLowerCase().includes(q)) ||
+        (m.subject && m.subject.toLowerCase().includes(q)) ||
+        (m.message && m.message.toLowerCase().includes(q))
+      );
+    }
+
+    if (filtered.length === 0) {
+      if (loadedInboxMessages.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div style="font-size:2rem;margin-bottom:0.5rem;">📬</div>
+            <strong>No inquiries received yet.</strong>
+            <p style="margin:0.25rem 0 0;font-size:0.8rem;color:var(--text-muted);">
+              When visitors or recruiters submit messages via your contact form, they are saved in SQLite (<code>portfolio.db</code>) and will appear here in real time on any device.
+            </p>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="empty-state">
+            <strong>No inquiries match your filter or search.</strong>
+            <p style="margin:0.25rem 0 0;font-size:0.8rem;color:var(--text-muted);">
+              Try selecting "All" or clearing the search keyword.
+            </p>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    container.innerHTML = filtered.map(m => {
+      const isUnread = !m.is_read || m.is_read === 0 || m.is_read === '0';
+      const isGmailSent = m.email_sent === 1 || m.email_sent === '1';
+      const isReplied = m.reply_sent === 1 || m.reply_sent === '1';
+
+      return `
+        <div class="msg-card ${isUnread ? 'is-unread' : ''}" data-msg-id="${m.id}">
+          <div class="msg-header">
+            <div class="msg-sender-meta">
+              <div class="msg-sender-row">
+                <span class="msg-sender">${escapeHtml(m.name)}</span>
+                <a href="mailto:${escapeHtml(m.email)}" class="msg-email" title="Click to email">${escapeHtml(m.email)}</a>
+              </div>
+              <time class="msg-date">🕒 ${new Date(m.created_at).toLocaleString()}</time>
+            </div>
+
+            <div class="msg-meta-badges">
+              ${isUnread 
+                ? '<span class="msg-badge msg-badge-new">NEW</span>' 
+                : '<span class="msg-badge msg-badge-read">READ</span>'}
+              
+              ${isGmailSent 
+                ? '<span class="msg-badge msg-badge-gmail" title="Notification delivered to your Gmail inbox">✉️ Gmail Alert Sent</span>' 
+                : '<span class="msg-badge" title="Stored safely in centralized SQLite database">🗄️ In SQLite DB</span>'}
+
+              ${isReplied 
+                ? '<span class="msg-badge msg-badge-replied" title="You sent a reply to this inquiry">↩️ Replied</span>' 
+                : ''}
+            </div>
+          </div>
+
+          <div class="msg-subject-row">
+            <span>Subject:</span>
+            <strong>${escapeHtml(m.subject || 'Portfolio Inquiry')}</strong>
+          </div>
+
+          <div class="msg-body">${escapeHtml(m.message)}</div>
+
+          ${isReplied && m.reply_message ? `
+            <div class="msg-reply-history">
+              <div class="msg-reply-history-header">
+                <span>↩️ Admin Reply via Gmail</span>
+                <time>${m.replied_at ? new Date(m.replied_at).toLocaleString() : 'Delivered'}</time>
+              </div>
+              <div class="msg-reply-history-content">${escapeHtml(m.reply_message)}</div>
+            </div>
+          ` : ''}
+
+          <!-- Inline Quick Reply Box -->
+          <div id="quick-reply-box-${m.id}" class="msg-quick-reply-box" style="display:none;">
+            <textarea id="reply-text-${m.id}" placeholder="Type your reply to ${escapeHtml(m.name)}... (Will be delivered from your configured Gmail address)"></textarea>
+            <div class="quick-reply-actions">
+              <button type="button" class="btn btn-sm btn-outline" onclick="window.toggleQuickReply(${m.id})">Cancel</button>
+              <button type="button" class="btn btn-sm btn-primary" id="send-reply-btn-${m.id}" onclick="window.sendQuickReply(${m.id}, '${escapeHtml(m.email)}', '${escapeHtml(m.subject || 'Portfolio Inquiry')}')">
+                <span>🚀 Send Reply via Gmail</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="msg-actions">
+            <button class="btn btn-sm btn-primary" onclick="window.toggleQuickReply(${m.id})">
+              💬 Reply via Gmail
+            </button>
+            <a href="mailto:${escapeHtml(m.email)}?subject=Re: ${encodeURIComponent(m.subject || 'Portfolio Inquiry')}" class="btn btn-sm btn-outline" title="Open native mail client">
+              ✉️ Open in Mail App
+            </a>
+            <button class="btn btn-sm btn-outline" onclick="window.toggleMessageRead(${m.id}, ${isUnread ? 1 : 0})">
+              ${isUnread ? 'Mark as Read' : 'Mark as Unread'}
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="window.deleteMessageFromDb(${m.id})" title="Delete inquiry from SQLite database">
+              🗑️ Delete
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  };
+
   const fetchMessagesFromDb = async () => {
     let messages = [];
     if (window.location.protocol.startsWith('http')) {
       try {
-        const res = await fetch('/api/messages');
-        if (res.ok) messages = await res.json();
-      } catch (e) {}
+        const res = await safeFetchJson(getApiUrl('/api/messages'));
+        if (res.ok && Array.isArray(res.data)) messages = res.data;
+      } catch (e) {
+        console.warn('Failed to fetch messages from server:', e);
+      }
     }
+
     if (!messages || messages.length === 0) {
       messages = JSON.parse(localStorage.getItem('keerthan_contact_messages') || '[]');
     }
 
+    loadedInboxMessages = messages || [];
+
+    // Calculate badge counts
+    const unreadCount = loadedInboxMessages.filter(m => !m.is_read || m.is_read === 0 || m.is_read === '0').length;
+    const repliedCount = loadedInboxMessages.filter(m => m.reply_sent === 1 || m.reply_sent === '1').length;
+
     const badge = document.getElementById('msg-badge-count');
-    if (badge) badge.textContent = messages.length;
+    if (badge) badge.textContent = unreadCount;
 
-    const container = document.getElementById('messages-list-container');
-    if (container) {
-      if (messages.length === 0) {
-        container.innerHTML = '<div class="empty-state">No inquiries received yet. Messages sent via the contact form will be stored in the database and appear here.</div>';
-        return;
+    const countAll = document.getElementById('count-all-msgs');
+    if (countAll) countAll.textContent = loadedInboxMessages.length;
+
+    const countUnread = document.getElementById('count-unread-msgs');
+    if (countUnread) countUnread.textContent = unreadCount;
+
+    const countReplied = document.getElementById('count-replied-msgs');
+    if (countReplied) countReplied.textContent = repliedCount;
+
+    renderInboxMessages();
+  };
+
+  // Toggle Read/Unread status
+  window.toggleMessageRead = async (id, isRead) => {
+    if (window.location.protocol.startsWith('http')) {
+      try {
+        await fetch(getApiUrl(`/api/messages/${id}/read`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isRead: !!isRead })
+        });
+      } catch (e) {}
+    }
+
+    // Update local state
+    const msg = loadedInboxMessages.find(m => m.id === id || String(m.id) === String(id));
+    if (msg) msg.is_read = isRead ? 1 : 0;
+    fetchMessagesFromDb();
+    fetchDbStats();
+    showToast(isRead ? 'Marked inquiry as read.' : 'Marked inquiry as unread.', 'info');
+  };
+
+  // Mark all messages as read
+  const markAllReadBtn = document.getElementById('mark-all-read-btn');
+  if (markAllReadBtn) {
+    markAllReadBtn.addEventListener('click', async () => {
+      if (window.location.protocol.startsWith('http')) {
+        try {
+          await fetch(getApiUrl('/api/messages/mark-all-read'), { method: 'POST' });
+        } catch (e) {}
       }
+      loadedInboxMessages.forEach(m => { m.is_read = 1; });
+      fetchMessagesFromDb();
+      fetchDbStats();
+      showToast('All messages marked as read.', 'success');
+    });
+  }
 
-      container.innerHTML = messages.map(m => `
-        <div class="msg-card" data-msg-id="${m.id}">
-          <div class="msg-header">
-            <div>
-              <span class="msg-sender">${m.name}</span>
-              <a href="mailto:${m.email}" class="msg-email">${m.email}</a>
-            </div>
-            <time class="msg-date">${new Date(m.created_at).toLocaleString()}</time>
-          </div>
-          <div class="msg-subject">Subject: ${m.subject || 'Inquiry'}</div>
-          <div class="msg-body">${m.message}</div>
-          <div class="msg-actions">
-            <a href="mailto:${m.email}?subject=Re: ${encodeURIComponent(m.subject || 'Portfolio Inquiry')}" class="btn btn-sm btn-primary">✉️ Reply via Email</a>
-            <button class="btn btn-sm btn-danger" onclick="window.deleteMessageFromDb(${m.id})">🗑️ Delete</button>
-          </div>
-        </div>
-      `).join('');
+  // Toggle quick reply box
+  window.toggleQuickReply = (id) => {
+    const box = document.getElementById(`quick-reply-box-${id}`);
+    if (!box) return;
+    const isHidden = box.style.display === 'none';
+    box.style.display = isHidden ? 'flex' : 'none';
+    if (isHidden) {
+      const textarea = document.getElementById(`reply-text-${id}`);
+      if (textarea) textarea.focus();
     }
   };
 
+  // Send quick reply via Gmail SMTP
+  window.sendQuickReply = async (id, recipientEmail, subject) => {
+    const textarea = document.getElementById(`reply-text-${id}`);
+    const sendBtn = document.getElementById(`send-reply-btn-${id}`);
+    if (!textarea) return;
+
+    const replyText = textarea.value.trim();
+    if (!replyText) {
+      showToast('Please type your reply before sending.', 'error');
+      textarea.focus();
+      return;
+    }
+
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.querySelector('span').textContent = 'Sending via Gmail...';
+    }
+
+    const res = await safeFetchJson(getApiUrl(`/api/messages/${id}/reply`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        replyText,
+        recipientEmail,
+        subject
+      })
+    });
+
+    if (res.ok && res.data && res.data.success) {
+      showToast(`Reply delivered to ${recipientEmail} via Gmail!`, 'success', 4000);
+      window.toggleQuickReply(id);
+      fetchMessagesFromDb();
+    } else {
+      let errText = (res.data && res.data.error) || 'Failed to send reply.';
+      if (res.isHtml || res.isNetworkError) {
+        errText = 'Email backend service is currently offline. Please run "npm start" locally or verify your Netlify SMTP configuration.';
+      }
+      showToast(errText, 'error', 5000);
+    }
+
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.querySelector('span').textContent = '🚀 Send Reply via Gmail';
+    }
+  };
+
+  // Delete message from database
   window.deleteMessageFromDb = async (id) => {
-    if (!confirm('Are you sure you want to delete this message from the database?')) return;
+    if (!confirm('Are you sure you want to delete this message from the central database? This action cannot be undone.')) return;
     if (window.location.protocol.startsWith('http')) {
       try {
-        await fetch(`/api/messages/${id}`, { method: 'DELETE' });
+        await fetch(getApiUrl(`/api/messages/${id}`), { method: 'DELETE' });
       } catch (e) {}
     }
+    loadedInboxMessages = loadedInboxMessages.filter(x => x.id !== id && String(x.id) !== String(id));
     const local = JSON.parse(localStorage.getItem('keerthan_contact_messages') || '[]');
     const filtered = local.filter(x => x.id !== id && String(x.id) !== String(id));
     localStorage.setItem('keerthan_contact_messages', JSON.stringify(filtered));
     fetchMessagesFromDb();
     fetchDbStats();
-    showToast('Inquiry deleted from database.', 'info');
+    showToast('Inquiry permanently removed from database.', 'info');
   };
 
+  // Wire search input
+  const inboxSearchInput = document.getElementById('inbox-search-input');
+  if (inboxSearchInput) {
+    inboxSearchInput.addEventListener('input', (e) => {
+      currentInboxSearch = e.target.value;
+      renderInboxMessages();
+    });
+  }
+
+  // Wire filter pills
+  document.querySelectorAll('.filter-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentInboxFilter = btn.getAttribute('data-filter') || 'all';
+      renderInboxMessages();
+    });
+  });
+
+  // Database stats updater
   const fetchDbStats = async () => {
     if (window.location.protocol.startsWith('http')) {
       try {
-        const res = await fetch('/api/database/stats');
-        if (res.ok) {
-          const stats = await res.json();
+        const res = await safeFetchJson(getApiUrl('/api/database/stats'));
+        if (res.ok && res.data) {
+          const stats = res.data;
           const eng = document.getElementById('db-stat-engine');
           const msgs = document.getElementById('db-stat-msgs');
           const size = document.getElementById('db-stat-size');
           if (eng) eng.textContent = stats.databaseEngine;
-          if (msgs) msgs.textContent = stats.totalMessages;
+          if (msgs) msgs.textContent = `${stats.totalMessages} (${stats.unreadMessages || 0} unread)`;
           if (size) size.textContent = Math.round(stats.fileSizeBytes / 1024) + ' KB';
         }
       } catch (e) {}
@@ -1735,7 +2947,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (refreshMsgBtn) {
     refreshMsgBtn.addEventListener('click', () => {
       fetchMessagesFromDb();
-      showToast('Inbox refreshed from database.', 'info');
+      fetchDbStats();
+      showToast('Centralized inbox refreshed from SQLite database.', 'info');
     });
   }
 
@@ -1743,6 +2956,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (dbResyncBtn) {
     dbResyncBtn.addEventListener('click', () => {
       loadPortfolioData();
+      fetchMessagesFromDb();
+      loadEmailSettings();
       fetchDbStats();
       showToast('Database resynchronized successfully.', 'success');
     });
@@ -1750,12 +2965,315 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* --------------------------------------------------------------------------
-     15. INITIAL BOOTSTRAP
+     15. GOOGLE APP PASSWORD & EMAIL SETTINGS ENGINE
+     -------------------------------------------------------------------------- */
+  const emailSettingsForm = document.getElementById('email-settings-form');
+  const testEmailBtn = document.getElementById('test-email-settings-btn');
+  const emailFeedback = document.getElementById('email-settings-feedback');
+  const toggleAppPasswordBtn = document.getElementById('toggle-app-password-btn');
+
+  const EMAIL_SETTINGS_KEY = 'keerthan_email_settings';
+
+  const applyEmailSettingsToUI = (data, source = 'local') => {
+    if (!data) return;
+    const gmailUserInput = document.getElementById('cfg-gmail-user');
+    const appPassInput = document.getElementById('cfg-app-password');
+    const notifyEmailInput = document.getElementById('cfg-notify-email');
+    const senderNameInput = document.getElementById('cfg-sender-name');
+    const notifEnabledCheck = document.getElementById('cfg-email-notifications-enabled');
+    const autoReplyCheck = document.getElementById('cfg-auto-reply-enabled');
+    const passStatusSpan = document.getElementById('cfg-app-pass-status');
+    const smtpChip = document.getElementById('google-smtp-status-chip');
+    const inboxEmailChip = document.getElementById('inbox-email-status-chip');
+
+    if (gmailUserInput && data.gmailUser) gmailUserInput.value = data.gmailUser;
+    if (notifyEmailInput && (data.notifyEmail || data.notify_email)) {
+      notifyEmailInput.value = data.notifyEmail || data.notify_email;
+    }
+    if (senderNameInput && (data.senderName || data.from_name)) {
+      senderNameInput.value = data.senderName || data.from_name;
+    }
+    if (notifEnabledCheck && data.emailNotificationsEnabled !== undefined) {
+      notifEnabledCheck.checked = !!data.emailNotificationsEnabled;
+    }
+    if (autoReplyCheck && data.autoReplyEnabled !== undefined) {
+      autoReplyCheck.checked = !!data.autoReplyEnabled;
+    }
+
+    const hasPass = !!(data.hasPassword || (data.appPassword && data.appPassword.length > 0) || (data.maskedPassword && data.maskedPassword.length > 0));
+    if (hasPass) {
+      if (appPassInput) {
+        appPassInput.placeholder = '•••••••••••••••• (16-char App Password Active)';
+        if (!appPassInput.value || appPassInput.value === '••••••••••••••••') {
+          appPassInput.value = '••••••••••••••••';
+        }
+      }
+      if (passStatusSpan) {
+        passStatusSpan.textContent = source === 'server'
+          ? '(✓ Saved in SQLite Database for all devices)'
+          : '(✓ Saved in Browser Storage)';
+        passStatusSpan.style.color = '#10b981';
+      }
+      if (smtpChip) {
+        smtpChip.textContent = '☁️ Google SMTP: Active & Ready';
+        smtpChip.style.background = 'rgba(16, 185, 129, 0.12)';
+        smtpChip.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        smtpChip.style.color = '#10b981';
+      }
+      if (inboxEmailChip) {
+        inboxEmailChip.textContent = '✉️ Gmail Alerts: Enabled';
+        inboxEmailChip.style.color = '#10b981';
+      }
+    } else {
+      if (appPassInput && !appPassInput.value) {
+        appPassInput.placeholder = 'Paste 16-character Google App Password';
+      }
+      if (passStatusSpan) {
+        passStatusSpan.textContent = '(Not configured yet)';
+        passStatusSpan.style.color = '#f59e0b';
+      }
+      if (smtpChip) {
+        smtpChip.textContent = '☁️ Google SMTP: Setup Required';
+        smtpChip.style.background = 'rgba(245, 158, 11, 0.12)';
+        smtpChip.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+        smtpChip.style.color = '#d97706';
+      }
+      if (inboxEmailChip) {
+        inboxEmailChip.textContent = '✉️ Gmail Alerts: Not Configured';
+        inboxEmailChip.style.color = '#d97706';
+      }
+    }
+  };
+
+  const loadEmailSettings = async () => {
+    // 1. Immediately restore cached email settings from local storage
+    try {
+      const stored = localStorage.getItem(EMAIL_SETTINGS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        applyEmailSettingsToUI(parsed, 'local');
+      }
+    } catch (e) {}
+
+    // 2. Sync latest settings from SQLite backend or Netlify function if available
+    if (!window.location.protocol.startsWith('http')) return;
+    try {
+      const res = await safeFetchJson(getApiUrl('/api/settings/email'));
+      if (res.ok && res.data) {
+        applyEmailSettingsToUI(res.data, 'server');
+        localStorage.setItem(EMAIL_SETTINGS_KEY, JSON.stringify(res.data));
+      }
+    } catch (e) {
+      console.warn('Backend email settings sync notice:', e);
+    }
+  };
+
+  // Toggle Password Visibility
+  if (toggleAppPasswordBtn) {
+    toggleAppPasswordBtn.addEventListener('click', () => {
+      const input = document.getElementById('cfg-app-password');
+      if (!input) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        toggleAppPasswordBtn.textContent = '🙈';
+        toggleAppPasswordBtn.title = 'Hide password';
+      } else {
+        input.type = 'password';
+        toggleAppPasswordBtn.textContent = '👁️';
+        toggleAppPasswordBtn.title = 'Show password';
+      }
+    });
+  }
+
+  // Save Email Settings Form
+  if (emailSettingsForm) {
+    emailSettingsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const saveBtn = document.getElementById('save-email-settings-btn');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.querySelector('span').textContent = 'Saving Settings...';
+      }
+
+      const gmailUser = document.getElementById('cfg-gmail-user').value.trim();
+      const rawAppPassword = document.getElementById('cfg-app-password').value.trim();
+      const notifyEmail = document.getElementById('cfg-notify-email').value.trim() || gmailUser;
+      const senderName = document.getElementById('cfg-sender-name').value.trim();
+      const emailNotificationsEnabled = document.getElementById('cfg-email-notifications-enabled').checked;
+      const autoReplyEnabled = document.getElementById('cfg-auto-reply-enabled').checked;
+
+      const payload = {
+        gmailUser,
+        appPassword: rawAppPassword,
+        notifyEmail,
+        senderName,
+        emailNotificationsEnabled,
+        autoReplyEnabled
+      };
+
+      // Check whether password is newly entered or already configured
+      let existingStored = {};
+      try {
+        existingStored = JSON.parse(localStorage.getItem(EMAIL_SETTINGS_KEY) || '{}');
+      } catch (err) {}
+
+      const hasPassword = !!(
+        (rawAppPassword && !rawAppPassword.includes('••••')) ||
+        existingStored.hasPassword
+      );
+
+      // 1. Immediately persist locally in localStorage so settings are NEVER lost
+      const localSettings = {
+        gmailUser,
+        notifyEmail,
+        senderName,
+        emailNotificationsEnabled,
+        autoReplyEnabled,
+        hasPassword,
+        maskedPassword: hasPassword ? '••••••••••••••••' : '',
+        lastSaved: new Date().toISOString()
+      };
+      localStorage.setItem(EMAIL_SETTINGS_KEY, JSON.stringify(localSettings));
+
+      // 2. Synchronize to central SQLite database or Netlify function
+      let serverSaved = false;
+      let serverErrorMessage = '';
+
+      if (window.location.protocol.startsWith('http')) {
+        const res = await safeFetchJson(getApiUrl('/api/settings/email'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok && res.data && res.data.success) {
+          serverSaved = true;
+        } else if (res.data && res.data.error) {
+          serverErrorMessage = res.data.error;
+        } else if (res.isHtml || res.isNetworkError) {
+          serverSaved = false;
+        }
+      }
+
+      if (serverSaved) {
+        if (emailFeedback) {
+          emailFeedback.hidden = false;
+          emailFeedback.className = 'form-alert success';
+          emailFeedback.innerHTML = `
+            <strong>✓ Google App Password &amp; Email Settings Saved!</strong>
+            <p style="margin:4px 0 0;font-size:0.8rem;">
+              Configuration has been written to the central SQLite database (<code>portfolio.db</code>) and is now permanently active across all devices.
+            </p>
+          `;
+        }
+        showToast('Google App Password & email settings saved for all devices!', 'success', 4000);
+      } else {
+        if (emailFeedback) {
+          emailFeedback.hidden = false;
+          emailFeedback.className = 'form-alert success';
+          emailFeedback.innerHTML = `
+            <strong>✓ Email Settings Saved Locally in Browser Storage!</strong>
+            <p style="margin:4px 0 0;font-size:0.8rem;color:#cbd5e1;">
+              Settings are saved and active on this browser. ${serverErrorMessage ? `<br><span style="color:#f59e0b;">Backend status: ${escapeHtml(serverErrorMessage)}</span>` : '<br><span style="color:#94a3b8;">(To sync permanently across all devices via the central SQLite database, start the Node server with <code>npm start</code> or deploy to Netlify.)</span>'}
+            </p>
+          `;
+        }
+        showToast('Email settings saved successfully in browser storage!', 'success', 4000);
+      }
+
+      loadEmailSettings();
+      fetchDbStats();
+
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.querySelector('span').textContent = '💾 Save Email Settings for All Devices';
+      }
+    });
+  }
+
+  // Test Email Settings Button
+  if (testEmailBtn) {
+    testEmailBtn.addEventListener('click', async () => {
+      const gmailUser = document.getElementById('cfg-gmail-user').value.trim();
+      const appPassword = document.getElementById('cfg-app-password').value.trim();
+      const notifyEmail = document.getElementById('cfg-notify-email').value.trim() || gmailUser;
+
+      if (!gmailUser) {
+        showToast('Please enter your Gmail address first.', 'error');
+        document.getElementById('cfg-gmail-user').focus();
+        return;
+      }
+
+      testEmailBtn.disabled = true;
+      testEmailBtn.querySelector('span').textContent = 'Testing Google SMTP Connection...';
+
+      if (emailFeedback) {
+        emailFeedback.hidden = false;
+        emailFeedback.className = 'form-alert info';
+        emailFeedback.innerHTML = `<span>⏳ Verifying credentials with Google SMTP and dispatching test email...</span>`;
+      }
+
+      const res = await safeFetchJson(getApiUrl('/api/settings/email/test'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gmailUser,
+          appPassword,
+          testEmail: notifyEmail
+        })
+      });
+
+      if (res.ok && res.data && res.data.success) {
+        if (emailFeedback) {
+          emailFeedback.className = 'form-alert success';
+          emailFeedback.innerHTML = `
+            <strong>🎉 Google App Password Authenticated Successfully!</strong>
+            <p style="margin:4px 0 0;font-size:0.8rem;">
+              ${escapeHtml(res.data.message || 'Authentication successful!')} Check your inbox at <strong>${escapeHtml(notifyEmail)}</strong> to see the test email.
+            </p>
+          `;
+        }
+        showToast(`Success! Test email sent to ${notifyEmail}.`, 'success', 5000);
+        loadEmailSettings();
+      } else {
+        let errorDetail = (res.data && res.data.error) || '';
+        if (res.isHtml || res.isNetworkError) {
+          errorDetail = 'Backend email service is currently offline. To send live test emails, please run <code>npm start</code> in your terminal (or verify your Netlify serverless functions).';
+        }
+        if (emailFeedback) {
+          emailFeedback.className = 'form-alert error';
+          emailFeedback.innerHTML = `
+            <strong>❌ Google SMTP Connection Failed</strong>
+            <p style="margin:4px 0 0;font-size:0.8rem;line-height:1.5;">
+              ${errorDetail}
+            </p>
+            <div style="margin-top:6px;font-size:0.75rem;opacity:0.9;">
+              <strong>Troubleshooting tips:</strong><br>
+              1. If running locally, make sure your Node.js server is active: run <code>npm start</code> in your terminal.<br>
+              2. Make sure 2-Step Verification is turned ON on your Google Account.<br>
+              3. Generate a 16-character App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:inherit;text-decoration:underline;">myaccount.google.com/apppasswords</a>.<br>
+              4. Copy the 16 characters (spaces are automatically ignored).
+            </div>
+          `;
+        }
+        showToast('Google SMTP verification failed. Check credentials or start server.', 'error', 6000);
+      }
+
+      testEmailBtn.disabled = false;
+      testEmailBtn.querySelector('span').textContent = '🧪 Test Connection & Send Test Email';
+    });
+  }
+
+
+  /* --------------------------------------------------------------------------
+     16. INITIAL BOOTSTRAP
      -------------------------------------------------------------------------- */
   loadPortfolioData();
   renderAll();
   updateAdminUI();
   fetchMessagesFromDb();
+  loadEmailSettings();
   fetchDbStats();
 
 });

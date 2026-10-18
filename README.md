@@ -26,20 +26,28 @@ The website includes a persistent **SQLite 3** database (`portfolio.db`) managed
 | Table Name | Description |
 | :--- | :--- |
 | `portfolio_content` | Stores the complete portfolio JSON state (hero, bio, experience, projects, skills, contact info). |
-| `contact_messages` | Stores all incoming inquiries submitted via the website's contact form (name, email, subject, message, timestamp, status). |
+| `contact_messages` | Stores all incoming inquiries submitted via the website's contact form across all devices (name, email, subject, message, timestamp, read status, email delivery status, and admin replies). |
+| `system_settings` | Stores centralized configuration across all devices, including the Google App Password (16-char), Gmail user, notification targets, and auto-reply preferences. |
 | `admin_users` | Stores administrator credentials with SHA-256 password hashes. |
 | `activity_logs` | Logs audit events such as portfolio content saves, message submissions, and admin logins. |
 
 ### REST API Endpoints:
 - `GET /api/portfolio` — Fetches current portfolio content from SQLite (with fallback to default data).
 - `POST /api/portfolio` — Saves updated portfolio content directly into SQLite `portfolio_content`.
-- `POST /api/contact` — Persists a visitor's contact inquiry into SQLite `contact_messages`.
-- `GET /api/messages` — Retrieves visitor messages for the Admin CMS Inbox.
-- `DELETE /api/messages/:id` — Deletes a message by ID from SQLite.
-- `GET /api/database/stats` — Returns real-time database diagnostics (file size, total messages, active tables, engine type).
+- `POST /api/contact` — Persists a visitor's contact inquiry into SQLite `contact_messages` and queues an instant Gmail SMTP notification.
+- `GET /api/messages` — Retrieves visitor messages for the Admin CMS Central Inbox.
+- `POST /api/messages/:id/reply` — Sends an email reply directly to the visitor via Gmail SMTP using the configured Google App Password.
+- `POST /api/messages/:id/read` — Marks an individual inquiry as read or unread.
+- `POST /api/messages/mark-all-read` — Marks all inquiries as read in the database.
+- `DELETE /api/messages/:id` — Deletes a message by ID from SQLite for all devices.
+- `GET /api/settings/email` — Retrieves current email configuration (with Google App Password masked).
+- `POST /api/settings/email` — Saves Google App Password and email settings in SQLite for all devices.
+- `POST /api/settings/email/test` — Verifies Google App Password and Gmail SMTP connectivity with a live test email.
+- `GET /api/database/stats` — Returns real-time database diagnostics (file size, total messages, unread count, Google SMTP status).
 - `POST /api/auth/login` — Verifies administrator credentials against SQLite `admin_users`.
+- `POST /api/auth/change-password` — Updates administrator password hash in SQLite `admin_users` across all devices.
 
-> **Note**: If run without Node.js (e.g. on GitHub Pages or static hosts), the website automatically falls back to browser `localStorage` seamlessly.
+> **Note**: The Google App Password and email settings are stored centrally in SQLite (`portfolio.db`). Once saved via the CMS Dashboard, all devices (mobile, tablet, desktop) and visitors use these central settings automatically.
 
 ---
 
@@ -59,7 +67,8 @@ The website features **Private Stealth Mode**: the Admin button and controls are
 | **Mobile Gesture** | Triple-tap navbar logo | Opens Admin prompt on smartphones & tablets |
 | **Secret URL** | `https://your-domain/?admin` | Unlocks & authorizes your personal browser |
 | **Default Username** | `admin` | Used for server-side verification |
-| **Default Password** | `admin123` | Can be changed anytime in the **Security** tab |
+| **Default Password** | `Keerthan@2024` | Can be changed anytime in the **Security** tab |
+| **Login Timeout** | 20 seconds | Auto-closes and re-locks stealth mode if not logged in |
 | **Security Standard** | Web Crypto API SHA-256 | Cryptographically hashed in the browser |
 
 ---
@@ -68,7 +77,7 @@ The website features **Private Stealth Mode**: the Admin button and controls are
 
 ### 1. Live In-Place Visual Editing (Click-to-Edit)
 1. Open the Admin prompt using any of the secret triggers above (<kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>, triple-tapping the logo, or `?admin`).
-2. Enter the password `admin123`.
+2. Enter the password `Keerthan@2024`.
 3. The **Floating Admin Toolbar** will appear across the top.
 4. Toggle **Live Inline Edit** to **ON**.
 5. **Click directly on any text on the website** (Hero title, intro, bio paragraphs, stats, project descriptions, skills, or contact info).

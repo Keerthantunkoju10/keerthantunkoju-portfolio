@@ -8,13 +8,13 @@
   <meta name="theme-color" content="#0b0f19">
   <title>Keerthan Tunkoju | Software Developer &amp; AI/ML Graduate</title>
 
-  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <!-- Google Fonts: Inter, JetBrains Mono, Cinzel & Playfair Display -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=1.2">
 </head>
 <body>
   <!-- Accessible Skip Link -->
@@ -90,6 +90,7 @@
             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
           </svg>
           <span class="admin-btn-text">Admin</span>
+          <span class="admin-btn-timer-badge" id="admin-btn-timer-badge" style="display: none;">20s</span>
         </button>
 
         <!-- Theme Toggle Button -->
@@ -217,7 +218,7 @@
           <div class="about-image-card">
             <div class="avatar-container">
               <div class="avatar-graphic" id="profile-avatar-graphic">
-                <img id="profile-avatar-img" class="avatar-img" src="Assets/keerthan-photo.jpg" alt="Keerthan Tunkoju" onerror="this.style.display='none';document.getElementById('profile-avatar-svg').style.display='block';">
+                <img id="profile-avatar-img" class="avatar-img" src="Assets/keerthan-photo.jpg" alt="Keerthan Tunkoju" onload="this.style.display='block';document.getElementById('profile-avatar-svg').style.display='none';document.getElementById('profile-avatar-graphic')?.classList.add('has-image');" onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='Assets/profile-photo.jpg';}else{this.style.display='none';document.getElementById('profile-avatar-svg').style.display='block';document.getElementById('profile-avatar-graphic')?.classList.remove('has-image');}">
                 <svg id="profile-avatar-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" aria-label="Keerthan Tunkoju avatar" style="display:none;">
                   <defs>
                     <linearGradient id="avatarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -274,13 +275,6 @@
           <p class="section-intro">Practical industry experience spanning spatial engineering, software scripting, and web development.</p>
         </header>
 
-        <!-- Admin Experience Quick Add Button -->
-        <div class="admin-section-actions" data-admin-only hidden>
-          <button id="add-experience-btn" class="btn btn-sm btn-primary">
-            <span>+ Add New Experience</span>
-          </button>
-        </div>
-
         <div class="timeline-container" id="timeline-container">
           <!-- Rendered Dynamically -->
         </div>
@@ -312,13 +306,6 @@
           <div class="title-underline"></div>
           <p class="section-intro">Demonstrating practical applications of Deep Learning, Machine Learning, GIS Spatial Engineering, and Full-Stack Web Development.</p>
         </header>
-
-        <!-- Admin Projects Quick Add Button -->
-        <div class="admin-section-actions" data-admin-only hidden>
-          <button id="add-project-btn" class="btn btn-sm btn-primary">
-            <span>+ Add New Project</span>
-          </button>
-        </div>
 
         <div class="projects-grid" id="projects-container">
           <!-- Rendered Dynamically -->
@@ -451,6 +438,8 @@
       <div class="footer-bottom">
         <p class="copyright-text">
           &copy; <span id="current-year">2026</span> <span id="footer-copy-name">Keerthan Tunkoju</span>. All rights reserved.
+          <span class="footer-admin-dot">&bull;</span>
+          <button type="button" class="footer-admin-link" id="footer-admin-btn" title="Admin CMS Portal">🔒 Admin Login</button>
         </p>
         <a href="#hero" class="back-to-top" aria-label="Scroll back to top of page">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -477,6 +466,17 @@
         <button class="modal-close-btn" data-close-modal title="Close modal">&times;</button>
       </div>
       <div class="modal-body">
+        <!-- 20-Second Security Timeout Banner -->
+        <div class="admin-timer-banner" id="admin-login-timer-wrap">
+          <div class="admin-timer-content">
+            <span class="admin-timer-label">⏱️ Security Timeout:</span>
+            <span class="admin-timer-val">Auto-closing in <strong id="admin-timer-countdown">20s</strong></span>
+          </div>
+          <div class="admin-timer-bar">
+            <div class="admin-timer-progress" id="admin-timer-progress" style="width: 100%;"></div>
+          </div>
+        </div>
+
         <p class="modal-desc">Enter the administrative password to unlock live inline website editing and content management.</p>
         
         <form id="admin-login-form">
@@ -521,7 +521,9 @@
         <button class="cms-tab-btn" data-tab="tab-experience">Experience</button>
         <button class="cms-tab-btn" data-tab="tab-projects">Projects</button>
         <button class="cms-tab-btn" data-tab="tab-skills">Skills</button>
-        <button class="cms-tab-btn" data-tab="tab-messages">📬 Inbox (<span id="msg-badge-count">0</span>)</button>
+        <button class="cms-tab-btn" data-tab="tab-certifications">Certifications (<span id="cms-cert-count">0</span>)</button>
+        <button class="cms-tab-btn" data-tab="tab-messages">📬 Central Inbox (<span id="msg-badge-count">0</span>)</button>
+        <button class="cms-tab-btn" data-tab="tab-email-settings">📧 Google App Password &amp; Mail</button>
         <button class="cms-tab-btn" data-tab="tab-database">🗄️ Database</button>
         <button class="cms-tab-btn" data-tab="tab-backup">Data &amp; Backup</button>
         <button class="cms-tab-btn" data-tab="tab-security">Security</button>
@@ -673,6 +675,17 @@
           </div>
         </div>
 
+        <!-- Tab: Certifications Manager -->
+        <div id="tab-certifications" class="cms-tab-pane">
+          <div class="cms-pane-header">
+            <p class="cms-pane-desc">Manage industry certifications, course credentials, and certificate documents (PDF or Image).</p>
+            <button class="btn btn-sm btn-primary" id="cms-add-cert-btn">+ Add Certification</button>
+          </div>
+          <div class="cms-item-list" id="cms-cert-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
         <!-- Tab 5: Data Backup & Reset -->
         <div id="tab-backup" class="cms-tab-pane">
           <div class="backup-section">
@@ -683,7 +696,11 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                 <span>Download portfolio-data.json</span>
               </button>
-              <button id="cms-copy-json-btn" class="btn btn-secondary">Copy JSON to Clipboard</button>
+              <button id="cms-export-datajs-btn" class="btn btn-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                <span>Download data.js</span>
+              </button>
+              <button id="cms-copy-json-btn" class="btn btn-outline">Copy JSON</button>
             </div>
           </div>
 
@@ -781,18 +798,146 @@
           </form>
         </div>
 
-        <!-- Tab 7: Contact Messages Inbox (Stored in Database) -->
+        <!-- Tab 6: Centralized Contact Messages Inbox (Stored in SQLite Database) -->
         <div id="tab-messages" class="cms-tab-pane">
+          <div class="inbox-dashboard-header">
+            <div class="inbox-header-titles">
+              <div class="inbox-badges-row">
+                <span class="inbox-chip chip-db">🗄️ SQLite Central DB: Active</span>
+                <span class="inbox-chip chip-email" id="inbox-email-status-chip">✉️ Gmail Alerts: Checking...</span>
+              </div>
+              <h4 class="backup-title">Centralized Inquiries Inbox</h4>
+              <p class="cms-pane-desc">Messages submitted across all devices, synchronized in real-time in <code>portfolio.db</code>.</p>
+            </div>
+            <div class="inbox-header-actions">
+              <button class="btn btn-sm btn-outline" id="mark-all-read-btn">✓ Mark All as Read</button>
+              <button class="btn btn-sm btn-secondary" id="refresh-messages-btn">🔄 Refresh Inbox</button>
+            </div>
+          </div>
+
+          <!-- Inbox Filter & Search Toolbar -->
+          <div class="inbox-toolbar">
+            <div class="inbox-search-box">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="inbox-search-input" class="inbox-search-field" placeholder="Search by name, email, or message keyword...">
+            </div>
+            <div class="inbox-filter-pills">
+              <button type="button" class="filter-pill active" data-filter="all">All (<span id="count-all-msgs">0</span>)</button>
+              <button type="button" class="filter-pill" data-filter="unread">Unread (<span id="count-unread-msgs">0</span>)</button>
+              <button type="button" class="filter-pill" data-filter="replied">Replied (<span id="count-replied-msgs">0</span>)</button>
+            </div>
+          </div>
+
+          <div id="messages-list-container" class="messages-list-wrap">
+            <!-- Dynamically populated from SQLite database -->
+          </div>
+        </div>
+
+        <!-- Tab 7: Google App Password & Gmail SMTP Settings (Centralized for All Devices) -->
+        <div id="tab-email-settings" class="cms-tab-pane">
           <div class="cms-pane-header">
             <div>
-              <h4 class="backup-title">Contact Inquiries Database</h4>
-              <p class="cms-pane-desc">Messages submitted by recruiters &amp; visitors via the contact form, stored in SQLite database.</p>
+              <div class="inbox-badges-row">
+                <span class="inbox-chip chip-cloud" id="google-smtp-status-chip">☁️ Google SMTP: Checking...</span>
+                <span class="inbox-chip chip-sync">🔄 Shared Across All Devices</span>
+              </div>
+              <h4 class="backup-title">Google App Password &amp; Email Delivery</h4>
+              <p class="cms-pane-desc">Configure your Google App Password once here. It is saved in the central SQLite database so all devices and visitors automatically forward email inquiries to your inbox.</p>
             </div>
-            <button class="btn btn-sm btn-secondary" id="refresh-messages-btn">🔄 Refresh Inbox</button>
           </div>
-          <div id="messages-list-container" class="messages-list-wrap">
-            <!-- Dynamically populated from database -->
+
+          <!-- How to get Google App Password Guide Card -->
+          <div class="email-guide-card">
+            <div class="guide-card-header">
+              <div class="guide-card-icon">🔑</div>
+              <div>
+                <strong>How to generate a 16-character Google App Password (in 60 seconds):</strong>
+                <p>Google App Passwords allow your portfolio server to securely send instant email notifications via your Gmail account without exposing your main password.</p>
+              </div>
+            </div>
+            <ol class="guide-steps-list">
+              <li>Turn ON <strong>2-Step Verification</strong> on your Google Account: <a href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener noreferrer">myaccount.google.com/signinoptions/two-step-verification ↗</a></li>
+              <li>Go to the Google App Passwords page: <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer"><strong>myaccount.google.com/apppasswords ↗</strong></a></li>
+              <li>Enter App Name as <code>Portfolio Website</code> and click <strong>Create</strong>.</li>
+              <li>Copy the <strong>16-character code</strong> (e.g. <code>abcd efgh ijkl mnop</code>) and paste it into the password box below. Spaces are automatically removed!</li>
+            </ol>
           </div>
+
+          <form id="email-settings-form" class="email-settings-form-grid">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfg-gmail-user" class="form-label">
+                  <span>Your Gmail Address</span>
+                  <span class="field-hint">(Used to send email via Gmail SMTP)</span>
+                </label>
+                <div class="input-icon-wrap">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                  <input type="email" id="cfg-gmail-user" class="form-input with-icon" placeholder="e.g. keerthantunkoju@gmail.com" required>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="cfg-app-password" class="form-label">
+                  <span>Google App Password (16 characters)</span>
+                  <span class="field-hint" id="cfg-app-pass-status">(Stored in SQLite)</span>
+                </label>
+                <div class="input-icon-wrap input-password-wrap">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                  <input type="password" id="cfg-app-password" class="form-input with-icon" placeholder="Paste 16-character Google App Password" autocomplete="off">
+                  <button type="button" class="btn-toggle-eye" id="toggle-app-password-btn" title="Toggle password visibility">👁️</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cfg-notify-email" class="form-label">
+                  <span>Forward Notifications To</span>
+                  <span class="field-hint">(Where visitor inquiries should arrive)</span>
+                </label>
+                <input type="email" id="cfg-notify-email" class="form-input" placeholder="e.g. keerthantunkoju@gmail.com">
+              </div>
+
+              <div class="form-group">
+                <label for="cfg-sender-name" class="form-label">
+                  <span>Sender Display Name</span>
+                  <span class="field-hint">(Shown in email sender line)</span>
+                </label>
+                <input type="text" id="cfg-sender-name" class="form-input" placeholder="e.g. Keerthan Tunkoju Portfolio">
+              </div>
+            </div>
+
+            <div class="checkbox-group-card">
+              <label class="custom-checkbox-row">
+                <input type="checkbox" id="cfg-email-notifications-enabled" checked>
+                <span class="checkbox-box"></span>
+                <span class="checkbox-label-text">
+                  <strong>Instant Email Alerts</strong>
+                  <span class="checkbox-desc">Receive immediate email notification whenever a visitor submits the contact form.</span>
+                </span>
+              </label>
+
+              <label class="custom-checkbox-row">
+                <input type="checkbox" id="cfg-auto-reply-enabled">
+                <span class="checkbox-box"></span>
+                <span class="checkbox-label-text">
+                  <strong>Automatic Confirmation to Visitor</strong>
+                  <span class="checkbox-desc">Send an instant receipt thank-you email to the visitor confirming their message was delivered.</span>
+                </span>
+              </label>
+            </div>
+
+            <div id="email-settings-feedback" class="form-alert" hidden></div>
+
+            <div class="email-settings-btn-group">
+              <button type="submit" class="btn btn-primary" id="save-email-settings-btn">
+                <span>💾 Save Email Settings for All Devices</span>
+              </button>
+              <button type="button" class="btn btn-secondary" id="test-email-settings-btn">
+                <span>🧪 Test Connection &amp; Send Test Email</span>
+              </button>
+            </div>
+          </form>
         </div>
 
         <!-- Tab 8: Database Status & Diagnostics -->
@@ -929,6 +1074,92 @@
     </div>
   </div>
 
+  <!-- 4b. Edit / Add Certification Modal -->
+  <div id="cert-edit-modal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg class="modal-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+          <h3 class="modal-title" id="cert-modal-title">Edit Certification</h3>
+        </div>
+        <button class="modal-close-btn" data-close-modal title="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="cert-edit-form">
+          <input type="hidden" id="cert-id">
+
+          <div class="form-group">
+            <label for="cert-title" class="form-label">Certification Title</label>
+            <input type="text" id="cert-title" class="form-input" placeholder="e.g. Web Development Internship Certification" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="cert-org" class="form-label">Issuing Organization / Company</label>
+              <input type="text" id="cert-org" class="form-input" placeholder="e.g. Intrainz, CodSoft, HackerRank" required>
+            </div>
+            <div class="form-group">
+              <label for="cert-year" class="form-label">Issue Year / Date</label>
+              <input type="text" id="cert-year" class="form-input" placeholder="e.g. 2023 or Nov 2023" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="cert-desc" class="form-label">Description / Summary (Optional)</label>
+            <textarea id="cert-desc" class="form-input form-textarea" rows="2" placeholder="Brief summary of skills, training, or project completed..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="cert-credential-url" class="form-label">Verification / Credential Link (Optional)</label>
+            <input type="url" id="cert-credential-url" class="form-input" placeholder="https://example.com/certificate/12345">
+          </div>
+
+          <!-- Document / File Attachment Section -->
+          <div class="cms-cert-upload-card">
+            <label class="form-label" style="margin-bottom:0.25rem;">Certificate Document (PDF or Image)</label>
+            <p class="cms-photo-hint" style="margin-bottom:0.75rem;">Upload a PDF or image (PNG, JPG, WebP) of your certificate to view it inside the certificate modal.</p>
+            
+            <div class="cms-cert-file-row">
+              <input type="file" id="cert-file-input" accept="application/pdf, image/png, image/jpeg, image/jpg, image/webp" style="display:none;">
+              <button type="button" class="btn btn-secondary btn-sm" id="cert-upload-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span>Upload PDF / Image</span>
+              </button>
+              <button type="button" class="btn btn-outline btn-sm" id="cert-remove-file-btn" style="display:none;">
+                <span>Remove Attached File</span>
+              </button>
+            </div>
+
+            <div class="cert-file-status" id="cert-file-status">
+              <span id="cert-file-status-text">No document attached yet (Digital credential preview will be generated).</span>
+            </div>
+
+            <div style="margin-top: 0.6rem;">
+              <input type="text" id="cert-file-url" class="form-input" placeholder="Or enter direct document path/URL (e.g. Assets/certifications/cert.pdf)">
+            </div>
+
+            <!-- Live Upload Preview Container inside modal -->
+            <div id="cert-upload-preview-container" class="cms-cert-preview-box" style="display:none;">
+              <div class="cms-cert-preview-header">
+                <span class="cert-file-badge" id="cert-preview-badge">📄 Document Attached</span>
+                <div style="display:flex; gap:0.5rem;">
+                  <a id="cert-preview-open-link" href="#" target="_blank" class="btn btn-sm btn-outline" style="padding:0.2rem 0.5rem;font-size:0.75rem;">↗ Open in Tab</a>
+                  <button type="button" id="cert-preview-test-modal" class="btn btn-sm btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.75rem;">👁 Preview Modal</button>
+                </div>
+              </div>
+              <div id="cert-inline-preview-wrap"></div>
+            </div>
+          </div>
+
+          <div class="modal-footer" style="margin-top: 1.5rem;">
+            <button type="button" class="btn btn-outline" data-close-modal>Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Certification</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- 5. Interactive Resume Preview Modal -->
   <div id="resume-modal" class="modal-backdrop modal-lg" hidden>
     <div class="modal-card">
@@ -966,11 +1197,54 @@
     </div>
   </div>
 
+  <!-- 6. Interactive Certification Preview Modal (Same Experience as Resume) -->
+  <div id="cert-preview-modal" class="modal-backdrop modal-lg" hidden>
+    <div class="modal-card cert-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <svg class="modal-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+          <div>
+            <h3 class="modal-title" id="cert-preview-title">Certification Preview</h3>
+            <span class="cert-preview-subtitle" id="cert-preview-subtitle"></span>
+          </div>
+        </div>
+        <button class="modal-close-btn" data-close-modal title="Close">&times;</button>
+      </div>
+
+      <div class="resume-modal-toolbar cert-modal-toolbar" id="cert-modal-toolbar">
+        <a id="cert-download-btn" href="#" download="" class="btn btn-sm btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Download Certificate</span>
+        </a>
+        <a id="cert-fullscreen-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          <span>Open Fullscreen</span>
+        </a>
+        <button id="cert-print-btn" type="button" class="btn btn-sm btn-outline">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          <span>Print / Save PDF</span>
+        </button>
+        <a id="cert-credential-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline" style="display:none;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          <span>Verify Credential</span>
+        </a>
+        <button id="cert-admin-edit-btn" type="button" class="btn btn-sm btn-outline" style="display:none; margin-left:auto;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+          <span>Edit in CMS</span>
+        </button>
+      </div>
+
+      <div class="modal-body cert-preview-body" id="cert-preview-body">
+        <!-- Dynamically rendered certificate content -->
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Floating Container -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
   <!-- Scripts: Default Data first, then Main Controller -->
-  <script src="data.js"></script>
-  <script src="script.js"></script>
+  <script src="data.js?v=1.2"></script>
+  <script src="script.js?v=1.2"></script>
 </body>
 </html>

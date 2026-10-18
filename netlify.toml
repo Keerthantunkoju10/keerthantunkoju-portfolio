@@ -2,6 +2,13 @@
 
 [build]
   publish = "."
+  functions = "netlify/functions"
+
+# Route API requests to the Netlify Serverless Function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
 
 # Security and caching headers
 [[headers]]
@@ -25,3 +32,18 @@
   for = "/Assets/*"
   [headers.values]
     Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
+
+# PDF Certifications headers - optimize inline viewing & downloading
+[[headers]]
+  for = "/Assets/certifications/*"
+  [headers.values]
+    Content-Type = "application/pdf"
+    Content-Disposition = "inline"
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
+
+# Case-insensitive rewrite for Linux Netlify hosting
+[[redirects]]
+  from = "/assets/*"
+  to = "/Assets/:splat"
+  status = 200
+
