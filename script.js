@@ -2577,7 +2577,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (resumeModal) {
         openModal(resumeModal);
       } else {
-        window.open('Keerthan_Tunkoju_Resume.pdf', '_blank');
+        window.open('KeerthanTunkoju.pdf', '_blank');
       }
     });
   }

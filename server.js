@@ -644,7 +644,7 @@ server.listen(PORT, () => {
   console.log(`\n==================================================================`);
   console.log(`🚀 Keerthan Portfolio Server running at http://localhost:${PORT}`);
   console.log(`🗄️  Database: SQLite (portfolio.db) active and initialized`);
-  console.log(`📄 Resume: http://localhost:${PORT}/Keerthan_Tunkoju_Resume.pdf`);
+  console.log(`📄 Resume: http://localhost:${PORT}/KeerthanTunkoju.pdf`);
   console.log(`🔑 Admin Login: Password "Keerthan@2024"`);
   console.log(`==================================================================\n`);
 });
