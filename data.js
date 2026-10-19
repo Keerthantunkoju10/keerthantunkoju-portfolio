@@ -13,23 +13,22 @@ const defaultPortfolioData = {
     "headlineStart": "Hi, I'm ",
     "headlineAccent": "Keerthan Tunkoju",
     "headlineEnd": ".",
-    "heroDescription": "Computer Science graduate specializing in Artificial Intelligence & Machine Learning and practicing GIS Engineer at NeoGeoInfo Technologies. Experienced in deep learning computer vision, predictive ML pipelines, spatial data engineering, and modern web applications.",
-    "aboutLead": "AI/ML-focused Computer Science graduate & practicing GIS Engineer with a passion for software engineering.",
+    "heroDescription": "Computer Science graduate specializing in Artificial Intelligence & Machine Learning. Experienced in deep learning computer vision, predictive ML pipelines, and modern web applications.",
+    "aboutLead": "AI/ML-focused Computer Science graduate with a passion for software engineering.",
     "aboutP1": "I graduated with a B.Tech in Computer Science & Engineering (Artificial Intelligence & Machine Learning) from Sri Indu Institute of Engineering & Technology. My academic journey provided rigorous training in Machine Learning, Deep Learning, Data Structures & Algorithms, and Database Management Systems.",
-    "aboutP2": "Currently, I work as a GIS Engineer at NeoGeoInfo Technologies Ltd., where I deliver production-ready urban GIS databases for the Greater Hyderabad Municipal Corporation (GHMC). I specialize in spatial data digitization, topology validation, and attribute QA/QC across roads, electric networks, drainage, water bodies, and civic infrastructure using ArcGIS, QGIS, Google Earth, and Global Mapper.",
-    "aboutP3": "In addition to spatial engineering, I have delivered end-to-end Machine Learning solutions—including deep learning CNNs for brain tumor medical imaging and supervised agricultural crop yield prediction models—and built responsive web applications during industry internships with Bharat Intern, CodSoft, and Intrainz.",
+    "aboutP2": "I have delivered end-to-end Machine Learning solutions—including deep learning CNNs for brain tumor medical imaging and supervised agricultural crop yield prediction models—and built responsive web applications during industry internships with Bharat Intern, CodSoft, and Intrainz.",
     "stats": [
       {
         "number": "AI & ML",
         "label": "B.Tech Specialization"
       },
       {
-        "number": "GHMC",
-        "label": "Urban GIS Mapping"
+        "number": "3",
+        "label": "Industry Internships"
       },
       {
-        "number": "3+",
-        "label": "Internships Completed"
+        "number": "2024",
+        "label": "Engineering Graduate"
       }
     ],
     "contact": {
@@ -46,57 +45,46 @@ const defaultPortfolioData = {
   "experience": [
     {
       "id": "exp-1",
-      "role": "GIS Engineer",
-      "company": "NeoGeoInfo Technologies Ltd.",
-      "period": "Feb 2026 – Present",
-      "bullets": [
-        "Digitized urban infrastructure layers including roads, footpaths, electric network, drainage, water bodies, parks, buildings, and land parcels for the Greater Hyderabad Municipal Corporation (GHMC).",
-        "Execute spatial data validation and topology correction to ensure geometric integrity and compliance with project standards.",
-        "Conduct attribute QA/QC using Excel, verifying data completeness, consistency, and accuracy across GIS layers.",
-        "Create and manage GIS layers for multi-stakeholder urban projects, delivering production-ready urban GIS databases supporting city planning.",
-        "Tools utilized: ArcGIS, QGIS, Google Earth, Global Mapper, and Microsoft Excel."
-      ]
-    },
-    {
-      "id": "exp-2",
       "role": "Python Programming Intern",
       "company": "CodSoft",
       "period": "Oct 2023 – Nov 2023",
       "bullets": [
-        "Built a feature-complete To-Do List application in Python with task addition, deletion, and persistent state storage.",
-        "Developed a GUI-based Calculator handling arithmetic computations, floating-point numbers, and error edge cases.",
+        "Built a feature-complete To-Do List application in Python with task add, delete, and persistence functionality.",
+        "Developed a GUI-based Calculator handling arithmetic, floating-point, and error edge cases.",
         "Implemented a Password Generator with configurable length, character sets, and entropy-based strength scoring."
+      ]
+    },
+    {
+      "id": "exp-2",
+      "role": "Web Developer Intern",
+      "company": "Bharat Intern",
+      "period": "Sep 2023 – Oct 2023",
+      "bullets": [
+        "Designed and deployed a personal Portfolio website using HTML, CSS, and JavaScript showcasing projects and skills.",
+        "Built a Temperature Converter tool supporting Celsius, Fahrenheit, and Kelvin conversions with real-time UI feedback.",
+        "Recreated the Netflix homepage as a responsive UI exercise, demonstrating CSS layout and component structuring."
       ]
     },
     {
       "id": "exp-3",
       "role": "Web Developer Intern",
-      "company": "Bharat Intern",
-      "period": "Sep 2023 – Oct 2023",
-      "bullets": [
-        "Designed and deployed a responsive personal Portfolio website using HTML5, CSS3, and JavaScript showcasing projects and skills.",
-        "Built an interactive Temperature Converter tool supporting Celsius, Fahrenheit, and Kelvin conversions with real-time UI feedback.",
-        "Recreated the Netflix Homepage as a responsive UI exercise, mastering CSS layout techniques, Flexbox, and component structuring."
-      ]
-    },
-    {
-      "id": "exp-4",
-      "role": "Web Developer Intern",
       "company": "Intrainz",
       "period": "Jun 2023 – Aug 2023",
       "bullets": [
-        "Developed a full Hotel website frontend using HTML, CSS, and JavaScript including room booking UI, responsive photo gallery, and contact form.",
-        "Completed structured industrial training covering modern front-end development workflows and software engineering best practices."
+        "Developed a full Hotel website frontend using HTML, CSS, and JavaScript including booking UI, gallery, and contact form.",
+        "Completed structured industrial training covering modern front-end development workflows and best practices."
       ]
     }
   ],
   "skills": [
     {
       "id": "cat-1",
-      "title": "Languages & Web",
-      "desc": "Programming languages and web technologies used for core application development.",
+      "title": "Languages & Web Technologies",
+      "desc": "Programming languages and responsive web technologies used for core application development.",
       "tags": [
         "Python",
+        "C",
+        "C++",
         "JavaScript",
         "SQL (MySQL)",
         "HTML5",
@@ -118,28 +106,15 @@ const defaultPortfolioData = {
     },
     {
       "id": "cat-3",
-      "title": "GIS & Spatial Engineering",
-      "desc": "Geographic Information Systems tools, urban digitization, and spatial quality control.",
-      "tags": [
-        "ArcGIS",
-        "QGIS",
-        "Google Earth",
-        "Global Mapper",
-        "Spatial Data Digitization",
-        "Topology Validation & QA/QC"
-      ]
-    },
-    {
-      "id": "cat-4",
-      "title": "Tools, Data & Leadership",
+      "title": "Tools, Databases & Professional Skills",
       "desc": "Workflow tooling, relational databases, and collaborative team competencies.",
       "tags": [
         "Git & GitHub",
-        "MySQL Database",
-        "Microsoft Excel (Data QA)",
+        "SQL (MySQL)",
+        "Microsoft Excel",
         "Problem Solving",
         "Team Leadership",
-        "Technical Communication"
+        "Communication"
       ]
     }
   ],
@@ -172,27 +147,11 @@ const defaultPortfolioData = {
         "Supervised Learning"
       ],
       "description": "Engineered an end-to-end ML pipeline modeling complex non-linear relationships between soil profiles, meteorological records, and agricultural management practices. Conducted systematic benchmarking across multiple supervised algorithms to achieve high prediction efficiency and low relative error.",
-      "githubUrl": "https://github.com/Keerthantunkoju10",
+      "githubUrl": "https://github.com/Keerthantunkoju10/Crop-Yield-Prediction-Using-Machine-Learning.git",
       "liveUrl": ""
     },
     {
       "id": "proj-3",
-      "title": "Urban Infrastructure Spatial Mapping (GHMC)",
-      "categoryBadge": "GIS & Spatial Engineering",
-      "mockupSub": "GHMC Urban Infrastructure",
-      "gradientClass": "preview-gradient-3",
-      "tags": [
-        "ArcGIS",
-        "QGIS",
-        "Topology QA",
-        "Excel"
-      ],
-      "description": "Led digitization and topological validation of municipal utilities—including road networks, electrical infrastructure, drainage, water bodies, parks, and land parcels—for the Greater Hyderabad Municipal Corporation, delivering a production-ready spatial database for city administration.",
-      "githubUrl": "",
-      "liveUrl": "#experience"
-    },
-    {
-      "id": "proj-4",
       "title": "Hotel Booking Website & Utility Suite",
       "categoryBadge": "Frontend & Python Tools",
       "mockupSub": "Web & Python Suite",
@@ -232,18 +191,18 @@ const defaultPortfolioData = {
       "title": "Web Development Internship Certification",
       "org": "Intrainz",
       "year": "2023",
-      "desc": "",
+      "desc": "Industrial training in full-stack frontend development, HTML5, CSS3, JavaScript, and responsive website architecture.",
       "credentialUrl": "",
-      "fileUrl": "Assets/certifications/internship_certificate__keerthan_tunkoju-1790667168838.pdf"
+      "fileUrl": "./Assets/certifications/internship_certificate__keerthan_tunkoju-1790667168838.pdf"
     },
     {
       "id": "cert-2",
       "title": "Python Programming Internship Certification",
       "org": "CodSoft",
       "year": "2023",
-      "desc": "",
-      "credentialUrl": "",
-      "fileUrl": "Assets/certifications/keerthan_tunkoju-1790667256921.pdf"
+      "desc": "Practical software engineering internship building algorithmic solutions, desktop GUI utilities, and security tools in Python.",
+      "credentialUrl": "./Assets/certifications/keerthan_tunkoju-1790667256921.pdf",
+      "fileUrl": "./Assets/certifications/keerthan_tunkoju-1790667256921.pdf"
     }
   ]
 };

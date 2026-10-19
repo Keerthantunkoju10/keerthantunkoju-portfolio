@@ -161,7 +161,7 @@ class PortfolioMailer {
   <div class="wrapper">
     <div class="header">
       <h1 class="brand-title">Keerthan Tunkoju</h1>
-      <p class="brand-subtitle">Software Developer &bull; AI &amp; ML Graduate &bull; GIS Engineer</p>
+      <p class="brand-subtitle">Software Developer &bull; AI &amp; ML Graduate</p>
     </div>
     <div class="content">
       ${content}

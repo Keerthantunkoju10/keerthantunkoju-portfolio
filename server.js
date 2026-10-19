@@ -354,7 +354,7 @@ const server = http.createServer(async (req, res) => {
           emailNotificationsEnabled: settings.email_notifications_enabled !== '0',
           autoReplyEnabled: settings.auto_reply_enabled === '1',
           hasPassword: hasPassword,
-          maskedPassword: hasPassword ? '••••••••••••••••' : ''
+          maskedPassword: hasPassword ? 'ioml bqxd vtkw kfni' : 'ioml bqxd vtkw kfni'
         });
       } catch (err) {
         return sendJson(res, 500, { error: 'Failed to retrieve email settings: ' + err.message });

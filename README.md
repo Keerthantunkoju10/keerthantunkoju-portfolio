@@ -67,7 +67,7 @@ The website features **Private Stealth Mode**: the Admin button and controls are
 | **Mobile Gesture** | Triple-tap navbar logo | Opens Admin prompt on smartphones & tablets |
 | **Secret URL** | `https://your-domain/?admin` | Unlocks & authorizes your personal browser |
 | **Default Username** | `admin` | Used for server-side verification |
-| **Default Password** | `Keerthan@2024` | Can be changed anytime in the **Security** tab |
+| **Default Password** | `*******` | Can be changed anytime in the **Security** tab |
 | **Login Timeout** | 20 seconds | Auto-closes and re-locks stealth mode if not logged in |
 | **Security Standard** | Web Crypto API SHA-256 | Cryptographically hashed in the browser |
 
@@ -77,7 +77,7 @@ The website features **Private Stealth Mode**: the Admin button and controls are
 
 ### 1. Live In-Place Visual Editing (Click-to-Edit)
 1. Open the Admin prompt using any of the secret triggers above (<kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd>, triple-tapping the logo, or `?admin`).
-2. Enter the password `Keerthan@2024`.
+2. Enter the password `*******`.
 3. The **Floating Admin Toolbar** will appear across the top.
 4. Toggle **Live Inline Edit** to **ON**.
 5. **Click directly on any text on the website** (Hero title, intro, bio paragraphs, stats, project descriptions, skills, or contact info).
