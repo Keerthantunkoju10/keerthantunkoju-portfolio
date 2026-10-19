@@ -60,54 +60,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let portfolioData = null;
   let isEditModeActive = false;
 
-  // Resolve backend API URL (handles cross-origin if loaded via Live Server port 5500, file://, or port 3000)
+  // Resolve backend API URL (handles cross-origin if loaded via Live Server port 5500 or port 3000)
   const getApiUrl = (endpoint) => {
-    if (window.location.protocol === 'file:') {
-      return `http://localhost:3000${endpoint}`;
-    }
     if (window.location.protocol.startsWith('http') && 
         (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && 
         window.location.port !== '3000') {
       return `http://${window.location.hostname}:3000${endpoint}`;
     }
     return endpoint;
-  };
-
-  // Safe JSON API fetch helper: avoids SyntaxError: Unexpected token '<' on non-JSON / HTML / offline responses
-  const safeFetchJson = async (url, options = {}) => {
-    try {
-      const res = await fetch(url, options);
-      const contentType = (res.headers && res.headers.get('content-type')) || '';
-      let data = null;
-      if (contentType.includes('application/json')) {
-        try {
-          data = await res.json();
-        } catch (e) {
-          data = null;
-        }
-      } else {
-        const text = await res.text();
-        try {
-          data = JSON.parse(text);
-        } catch (e) {
-          data = null;
-        }
-      }
-      return {
-        ok: res.ok,
-        status: res.status,
-        data: data,
-        isHtml: !contentType.includes('application/json') && data === null
-      };
-    } catch (netErr) {
-      return {
-        ok: false,
-        status: 0,
-        data: null,
-        error: netErr.message,
-        isNetworkError: true
-      };
-    }
   };
 
   const loadPortfolioData = () => {
@@ -829,19 +789,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const computedHash = await sha256(password);
     let isAuthenticated = false;
 
-    // 1. Authenticate against central SQLite database or Netlify function (works across all devices)
-    try {
-      const res = await safeFetchJson(getApiUrl('/api/auth/login'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hash: computedHash })
-      });
-      if (res.ok && res.data && res.data.authenticated === true) {
-        isAuthenticated = true;
-        setStoredHash(computedHash);
+    // 1. Authenticate against central SQLite database (works across all devices)
+    if (window.location.protocol.startsWith('http')) {
+      try {
+        const res = await fetch(getApiUrl('/api/auth/login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hash: computedHash })
+        });
+        if (res.ok) {
+          const authData = await res.json();
+          if (authData && authData.authenticated === true) {
+            isAuthenticated = true;
+            setStoredHash(computedHash);
+          }
+        }
+      } catch (e) {
+        console.warn('Backend login endpoint unreachable, checking local hash cache:', e);
       }
-    } catch (e) {
-      console.warn('Backend login endpoint unreachable, checking local hash cache:', e);
     }
 
     // 2. Fallback to cached local hash if offline / static
@@ -2559,12 +2524,14 @@ document.addEventListener('DOMContentLoaded', () => {
         message: messageInput.value.trim()
       };
 
-      // 1. Post to SQLite database on server or Netlify Serverless Function
-      const sendPromise = safeFetchJson(getApiUrl('/api/contact'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      // 1. Post to SQLite database on server
+      const sendPromise = window.location.protocol.startsWith('http')
+        ? fetch(getApiUrl('/api/contact'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }).then(res => res.json())
+        : Promise.resolve({ success: true, localOnly: true });
 
       sendPromise
         .then(() => {
@@ -2763,8 +2730,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let messages = [];
     if (window.location.protocol.startsWith('http')) {
       try {
-        const res = await safeFetchJson(getApiUrl('/api/messages'));
-        if (res.ok && Array.isArray(res.data)) messages = res.data;
+        const res = await fetch(getApiUrl('/api/messages'));
+        if (res.ok) messages = await res.json();
       } catch (e) {
         console.warn('Failed to fetch messages from server:', e);
       }
@@ -2861,31 +2828,32 @@ document.addEventListener('DOMContentLoaded', () => {
       sendBtn.querySelector('span').textContent = 'Sending via Gmail...';
     }
 
-    const res = await safeFetchJson(getApiUrl(`/api/messages/${id}/reply`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        replyText,
-        recipientEmail,
-        subject
-      })
-    });
+    try {
+      const res = await fetch(getApiUrl(`/api/messages/${id}/reply`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          replyText,
+          recipientEmail,
+          subject
+        })
+      });
 
-    if (res.ok && res.data && res.data.success) {
-      showToast(`Reply delivered to ${recipientEmail} via Gmail!`, 'success', 4000);
-      window.toggleQuickReply(id);
-      fetchMessagesFromDb();
-    } else {
-      let errText = (res.data && res.data.error) || 'Failed to send reply.';
-      if (res.isHtml || res.isNetworkError) {
-        errText = 'Email backend service is currently offline. Please run "npm start" locally or verify your Netlify SMTP configuration.';
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`Reply delivered to ${recipientEmail} via Gmail!`, 'success', 4000);
+        window.toggleQuickReply(id);
+        fetchMessagesFromDb();
+      } else {
+        showToast(data.error || 'Failed to send reply via Gmail.', 'error', 5000);
       }
-      showToast(errText, 'error', 5000);
-    }
-
-    if (sendBtn) {
-      sendBtn.disabled = false;
-      sendBtn.querySelector('span').textContent = '🚀 Send Reply via Gmail';
+    } catch (err) {
+      showToast('Network error while sending reply: ' + err.message, 'error');
+    } finally {
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.querySelector('span').textContent = '🚀 Send Reply via Gmail';
+      }
     }
   };
 
@@ -2929,14 +2897,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const fetchDbStats = async () => {
     if (window.location.protocol.startsWith('http')) {
       try {
-        const res = await safeFetchJson(getApiUrl('/api/database/stats'));
-        if (res.ok && res.data) {
-          const stats = res.data;
+        const res = await fetch(getApiUrl('/api/database/stats'));
+        if (res.ok) {
+          const stats = await res.json();
           const eng = document.getElementById('db-stat-engine');
           const msgs = document.getElementById('db-stat-msgs');
           const size = document.getElementById('db-stat-size');
           if (eng) eng.textContent = stats.databaseEngine;
-          if (msgs) msgs.textContent = `${stats.totalMessages} (${stats.unreadMessages || 0} unread)`;
+          if (msgs) msgs.textContent = `${stats.totalMessages} (${stats.unreadMessages} unread)`;
           if (size) size.textContent = Math.round(stats.fileSizeBytes / 1024) + ' KB';
         }
       } catch (e) {}
@@ -2972,99 +2940,69 @@ document.addEventListener('DOMContentLoaded', () => {
   const emailFeedback = document.getElementById('email-settings-feedback');
   const toggleAppPasswordBtn = document.getElementById('toggle-app-password-btn');
 
-  const EMAIL_SETTINGS_KEY = 'keerthan_email_settings';
-
-  const applyEmailSettingsToUI = (data, source = 'local') => {
-    if (!data) return;
-    const gmailUserInput = document.getElementById('cfg-gmail-user');
-    const appPassInput = document.getElementById('cfg-app-password');
-    const notifyEmailInput = document.getElementById('cfg-notify-email');
-    const senderNameInput = document.getElementById('cfg-sender-name');
-    const notifEnabledCheck = document.getElementById('cfg-email-notifications-enabled');
-    const autoReplyCheck = document.getElementById('cfg-auto-reply-enabled');
-    const passStatusSpan = document.getElementById('cfg-app-pass-status');
-    const smtpChip = document.getElementById('google-smtp-status-chip');
-    const inboxEmailChip = document.getElementById('inbox-email-status-chip');
-
-    if (gmailUserInput && data.gmailUser) gmailUserInput.value = data.gmailUser;
-    if (notifyEmailInput && (data.notifyEmail || data.notify_email)) {
-      notifyEmailInput.value = data.notifyEmail || data.notify_email;
-    }
-    if (senderNameInput && (data.senderName || data.from_name)) {
-      senderNameInput.value = data.senderName || data.from_name;
-    }
-    if (notifEnabledCheck && data.emailNotificationsEnabled !== undefined) {
-      notifEnabledCheck.checked = !!data.emailNotificationsEnabled;
-    }
-    if (autoReplyCheck && data.autoReplyEnabled !== undefined) {
-      autoReplyCheck.checked = !!data.autoReplyEnabled;
-    }
-
-    const hasPass = !!(data.hasPassword || (data.appPassword && data.appPassword.length > 0) || (data.maskedPassword && data.maskedPassword.length > 0));
-    if (hasPass) {
-      if (appPassInput) {
-        appPassInput.placeholder = '•••••••••••••••• (16-char App Password Active)';
-        if (!appPassInput.value || appPassInput.value === '••••••••••••••••') {
-          appPassInput.value = '••••••••••••••••';
-        }
-      }
-      if (passStatusSpan) {
-        passStatusSpan.textContent = source === 'server'
-          ? '(✓ Saved in SQLite Database for all devices)'
-          : '(✓ Saved in Browser Storage)';
-        passStatusSpan.style.color = '#10b981';
-      }
-      if (smtpChip) {
-        smtpChip.textContent = '☁️ Google SMTP: Active & Ready';
-        smtpChip.style.background = 'rgba(16, 185, 129, 0.12)';
-        smtpChip.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-        smtpChip.style.color = '#10b981';
-      }
-      if (inboxEmailChip) {
-        inboxEmailChip.textContent = '✉️ Gmail Alerts: Enabled';
-        inboxEmailChip.style.color = '#10b981';
-      }
-    } else {
-      if (appPassInput && !appPassInput.value) {
-        appPassInput.placeholder = 'Paste 16-character Google App Password';
-      }
-      if (passStatusSpan) {
-        passStatusSpan.textContent = '(Not configured yet)';
-        passStatusSpan.style.color = '#f59e0b';
-      }
-      if (smtpChip) {
-        smtpChip.textContent = '☁️ Google SMTP: Setup Required';
-        smtpChip.style.background = 'rgba(245, 158, 11, 0.12)';
-        smtpChip.style.borderColor = 'rgba(245, 158, 11, 0.3)';
-        smtpChip.style.color = '#d97706';
-      }
-      if (inboxEmailChip) {
-        inboxEmailChip.textContent = '✉️ Gmail Alerts: Not Configured';
-        inboxEmailChip.style.color = '#d97706';
-      }
-    }
-  };
-
   const loadEmailSettings = async () => {
-    // 1. Immediately restore cached email settings from local storage
-    try {
-      const stored = localStorage.getItem(EMAIL_SETTINGS_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        applyEmailSettingsToUI(parsed, 'local');
-      }
-    } catch (e) {}
-
-    // 2. Sync latest settings from SQLite backend or Netlify function if available
     if (!window.location.protocol.startsWith('http')) return;
     try {
-      const res = await safeFetchJson(getApiUrl('/api/settings/email'));
-      if (res.ok && res.data) {
-        applyEmailSettingsToUI(res.data, 'server');
-        localStorage.setItem(EMAIL_SETTINGS_KEY, JSON.stringify(res.data));
+      const res = await fetch(getApiUrl('/api/settings/email'));
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const gmailUserInput = document.getElementById('cfg-gmail-user');
+      const appPassInput = document.getElementById('cfg-app-password');
+      const notifyEmailInput = document.getElementById('cfg-notify-email');
+      const senderNameInput = document.getElementById('cfg-sender-name');
+      const notifEnabledCheck = document.getElementById('cfg-email-notifications-enabled');
+      const autoReplyCheck = document.getElementById('cfg-auto-reply-enabled');
+      const passStatusSpan = document.getElementById('cfg-app-pass-status');
+      const smtpChip = document.getElementById('google-smtp-status-chip');
+      const inboxEmailChip = document.getElementById('inbox-email-status-chip');
+
+      if (gmailUserInput) gmailUserInput.value = data.gmailUser || '';
+      if (notifyEmailInput) notifyEmailInput.value = data.notifyEmail || '';
+      if (senderNameInput) senderNameInput.value = data.senderName || 'Keerthan Tunkoju Portfolio';
+      if (notifEnabledCheck) notifEnabledCheck.checked = !!data.emailNotificationsEnabled;
+      if (autoReplyCheck) autoReplyCheck.checked = !!data.autoReplyEnabled;
+
+      if (data.hasPassword) {
+        if (appPassInput) {
+          appPassInput.placeholder = '•••••••••••••••• (16-char App Password Active)';
+          appPassInput.value = '••••••••••••••••';
+        }
+        if (passStatusSpan) {
+          passStatusSpan.textContent = '(✓ Saved in SQLite Database for all devices)';
+          passStatusSpan.style.color = '#10b981';
+        }
+        if (smtpChip) {
+          smtpChip.textContent = '☁️ Google SMTP: Active & Ready';
+          smtpChip.style.background = 'rgba(16, 185, 129, 0.12)';
+          smtpChip.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+          smtpChip.style.color = '#10b981';
+        }
+        if (inboxEmailChip) {
+          inboxEmailChip.textContent = '✉️ Gmail Alerts: Enabled';
+          inboxEmailChip.style.color = '#10b981';
+        }
+      } else {
+        if (appPassInput) {
+          appPassInput.placeholder = 'Paste 16-character Google App Password';
+        }
+        if (passStatusSpan) {
+          passStatusSpan.textContent = '(Not configured yet)';
+          passStatusSpan.style.color = '#f59e0b';
+        }
+        if (smtpChip) {
+          smtpChip.textContent = '☁️ Google SMTP: Setup Required';
+          smtpChip.style.background = 'rgba(245, 158, 11, 0.12)';
+          smtpChip.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+          smtpChip.style.color = '#d97706';
+        }
+        if (inboxEmailChip) {
+          inboxEmailChip.textContent = '✉️ Gmail Alerts: Not Configured';
+          inboxEmailChip.style.color = '#d97706';
+        }
       }
     } catch (e) {
-      console.warn('Backend email settings sync notice:', e);
+      console.warn('Failed to load email settings:', e);
     }
   };
 
@@ -3093,101 +3031,60 @@ document.addEventListener('DOMContentLoaded', () => {
       const saveBtn = document.getElementById('save-email-settings-btn');
       if (saveBtn) {
         saveBtn.disabled = true;
-        saveBtn.querySelector('span').textContent = 'Saving Settings...';
+        saveBtn.querySelector('span').textContent = 'Saving to Database...';
       }
 
-      const gmailUser = document.getElementById('cfg-gmail-user').value.trim();
-      const rawAppPassword = document.getElementById('cfg-app-password').value.trim();
-      const notifyEmail = document.getElementById('cfg-notify-email').value.trim() || gmailUser;
-      const senderName = document.getElementById('cfg-sender-name').value.trim();
-      const emailNotificationsEnabled = document.getElementById('cfg-email-notifications-enabled').checked;
-      const autoReplyEnabled = document.getElementById('cfg-auto-reply-enabled').checked;
-
       const payload = {
-        gmailUser,
-        appPassword: rawAppPassword,
-        notifyEmail,
-        senderName,
-        emailNotificationsEnabled,
-        autoReplyEnabled
+        gmailUser: document.getElementById('cfg-gmail-user').value.trim(),
+        appPassword: document.getElementById('cfg-app-password').value.trim(),
+        notifyEmail: document.getElementById('cfg-notify-email').value.trim() || document.getElementById('cfg-gmail-user').value.trim(),
+        senderName: document.getElementById('cfg-sender-name').value.trim(),
+        emailNotificationsEnabled: document.getElementById('cfg-email-notifications-enabled').checked,
+        autoReplyEnabled: document.getElementById('cfg-auto-reply-enabled').checked
       };
 
-      // Check whether password is newly entered or already configured
-      let existingStored = {};
       try {
-        existingStored = JSON.parse(localStorage.getItem(EMAIL_SETTINGS_KEY) || '{}');
-      } catch (err) {}
-
-      const hasPassword = !!(
-        (rawAppPassword && !rawAppPassword.includes('••••')) ||
-        existingStored.hasPassword
-      );
-
-      // 1. Immediately persist locally in localStorage so settings are NEVER lost
-      const localSettings = {
-        gmailUser,
-        notifyEmail,
-        senderName,
-        emailNotificationsEnabled,
-        autoReplyEnabled,
-        hasPassword,
-        maskedPassword: hasPassword ? '••••••••••••••••' : '',
-        lastSaved: new Date().toISOString()
-      };
-      localStorage.setItem(EMAIL_SETTINGS_KEY, JSON.stringify(localSettings));
-
-      // 2. Synchronize to central SQLite database or Netlify function
-      let serverSaved = false;
-      let serverErrorMessage = '';
-
-      if (window.location.protocol.startsWith('http')) {
-        const res = await safeFetchJson(getApiUrl('/api/settings/email'), {
+        const res = await fetch(getApiUrl('/api/settings/email'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
 
-        if (res.ok && res.data && res.data.success) {
-          serverSaved = true;
-        } else if (res.data && res.data.error) {
-          serverErrorMessage = res.data.error;
-        } else if (res.isHtml || res.isNetworkError) {
-          serverSaved = false;
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (emailFeedback) {
+            emailFeedback.hidden = false;
+            emailFeedback.className = 'form-alert success';
+            emailFeedback.innerHTML = `
+              <strong>✓ Google App Password &amp; Email Settings Saved!</strong>
+              <p style="margin:4px 0 0;font-size:0.8rem;">
+                Configuration has been written to the central SQLite database (<code>portfolio.db</code>). It is now permanently active across all devices, mobile phones, and tablets.
+              </p>
+            `;
+          }
+          showToast('Google App Password & email settings saved for all devices!', 'success', 4000);
+          loadEmailSettings();
+          fetchDbStats();
+        } else {
+          if (emailFeedback) {
+            emailFeedback.hidden = false;
+            emailFeedback.className = 'form-alert error';
+            emailFeedback.textContent = data.error || 'Failed to save email settings.';
+          }
+          showToast(data.error || 'Failed to save email settings.', 'error');
         }
-      }
-
-      if (serverSaved) {
+      } catch (err) {
         if (emailFeedback) {
           emailFeedback.hidden = false;
-          emailFeedback.className = 'form-alert success';
-          emailFeedback.innerHTML = `
-            <strong>✓ Google App Password &amp; Email Settings Saved!</strong>
-            <p style="margin:4px 0 0;font-size:0.8rem;">
-              Configuration has been written to the central SQLite database (<code>portfolio.db</code>) and is now permanently active across all devices.
-            </p>
-          `;
+          emailFeedback.className = 'form-alert error';
+          emailFeedback.textContent = 'Network error saving settings: ' + err.message;
         }
-        showToast('Google App Password & email settings saved for all devices!', 'success', 4000);
-      } else {
-        if (emailFeedback) {
-          emailFeedback.hidden = false;
-          emailFeedback.className = 'form-alert success';
-          emailFeedback.innerHTML = `
-            <strong>✓ Email Settings Saved Locally in Browser Storage!</strong>
-            <p style="margin:4px 0 0;font-size:0.8rem;color:#cbd5e1;">
-              Settings are saved and active on this browser. ${serverErrorMessage ? `<br><span style="color:#f59e0b;">Backend status: ${escapeHtml(serverErrorMessage)}</span>` : '<br><span style="color:#94a3b8;">(To sync permanently across all devices via the central SQLite database, start the Node server with <code>npm start</code> or deploy to Netlify.)</span>'}
-            </p>
-          `;
+        showToast('Error saving settings: ' + err.message, 'error');
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.querySelector('span').textContent = '💾 Save Email Settings for All Devices';
         }
-        showToast('Email settings saved successfully in browser storage!', 'success', 4000);
-      }
-
-      loadEmailSettings();
-      fetchDbStats();
-
-      if (saveBtn) {
-        saveBtn.disabled = false;
-        saveBtn.querySelector('span').textContent = '💾 Save Email Settings for All Devices';
       }
     });
   }
@@ -3214,54 +3111,58 @@ document.addEventListener('DOMContentLoaded', () => {
         emailFeedback.innerHTML = `<span>⏳ Verifying credentials with Google SMTP and dispatching test email...</span>`;
       }
 
-      const res = await safeFetchJson(getApiUrl('/api/settings/email/test'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gmailUser,
-          appPassword,
-          testEmail: notifyEmail
-        })
-      });
+      try {
+        const res = await fetch(getApiUrl('/api/settings/email/test'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gmailUser,
+            appPassword,
+            testEmail: notifyEmail
+          })
+        });
 
-      if (res.ok && res.data && res.data.success) {
-        if (emailFeedback) {
-          emailFeedback.className = 'form-alert success';
-          emailFeedback.innerHTML = `
-            <strong>🎉 Google App Password Authenticated Successfully!</strong>
-            <p style="margin:4px 0 0;font-size:0.8rem;">
-              ${escapeHtml(res.data.message || 'Authentication successful!')} Check your inbox at <strong>${escapeHtml(notifyEmail)}</strong> to see the test email.
-            </p>
-          `;
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (emailFeedback) {
+            emailFeedback.className = 'form-alert success';
+            emailFeedback.innerHTML = `
+              <strong>🎉 Google App Password Authenticated Successfully!</strong>
+              <p style="margin:4px 0 0;font-size:0.8rem;">
+                ${escapeHtml(data.message)} Check your inbox at <strong>${escapeHtml(notifyEmail)}</strong> to see the test email.
+              </p>
+            `;
+          }
+          showToast(`Success! Test email sent to ${notifyEmail}.`, 'success', 5000);
+          loadEmailSettings();
+        } else {
+          if (emailFeedback) {
+            emailFeedback.className = 'form-alert error';
+            emailFeedback.innerHTML = `
+              <strong>❌ Google SMTP Connection Failed</strong>
+              <p style="margin:4px 0 0;font-size:0.8rem;line-height:1.5;">
+                ${escapeHtml(data.error || 'Failed to authenticate with Google SMTP.')}
+              </p>
+              <div style="margin-top:6px;font-size:0.75rem;opacity:0.9;">
+                <strong>Troubleshooting tips:</strong><br>
+                1. Make sure 2-Step Verification is turned ON for your Google account.<br>
+                2. Generate a 16-character App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:inherit;text-decoration:underline;">myaccount.google.com/apppasswords</a>.<br>
+                3. Do NOT use your standard account password; you must use the 16-character App Password.
+              </div>
+            `;
+          }
+          showToast('Google SMTP verification failed. Check credentials.', 'error', 6000);
         }
-        showToast(`Success! Test email sent to ${notifyEmail}.`, 'success', 5000);
-        loadEmailSettings();
-      } else {
-        let errorDetail = (res.data && res.data.error) || '';
-        if (res.isHtml || res.isNetworkError) {
-          errorDetail = 'Backend email service is currently offline. To send live test emails, please run <code>npm start</code> in your terminal (or verify your Netlify serverless functions).';
-        }
+      } catch (err) {
         if (emailFeedback) {
           emailFeedback.className = 'form-alert error';
-          emailFeedback.innerHTML = `
-            <strong>❌ Google SMTP Connection Failed</strong>
-            <p style="margin:4px 0 0;font-size:0.8rem;line-height:1.5;">
-              ${errorDetail}
-            </p>
-            <div style="margin-top:6px;font-size:0.75rem;opacity:0.9;">
-              <strong>Troubleshooting tips:</strong><br>
-              1. If running locally, make sure your Node.js server is active: run <code>npm start</code> in your terminal.<br>
-              2. Make sure 2-Step Verification is turned ON on your Google Account.<br>
-              3. Generate a 16-character App Password at <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:inherit;text-decoration:underline;">myaccount.google.com/apppasswords</a>.<br>
-              4. Copy the 16 characters (spaces are automatically ignored).
-            </div>
-          `;
+          emailFeedback.textContent = 'Network error testing SMTP: ' + err.message;
         }
-        showToast('Google SMTP verification failed. Check credentials or start server.', 'error', 6000);
+        showToast('Error testing email: ' + err.message, 'error');
+      } finally {
+        testEmailBtn.disabled = false;
+        testEmailBtn.querySelector('span').textContent = '🧪 Test Connection & Send Test Email';
       }
-
-      testEmailBtn.disabled = false;
-      testEmailBtn.querySelector('span').textContent = '🧪 Test Connection & Send Test Email';
     });
   }
 

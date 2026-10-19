@@ -126,9 +126,9 @@ class PortfolioDatabase {
 
       // Seed Default System Settings (Gmail & App Password defaults)
       const defaultSettings = [
-        ['gmail_user', 'keerthantunkoju10@gmail.com'],
+        ['gmail_user', 'keerthantunkoju@gmail.com'],
         ['gmail_app_password', 'ioml bqxd vtkw kfni'],
-        ['notify_email', 'keerthantunkoju10@gmail.com'],
+        ['notify_email', 'keerthantunkoju@gmail.com'],
         ['sender_name', 'Keerthan Tunkoju Portfolio'],
         ['email_notifications_enabled', '1'],
         ['auto_reply_enabled', '0']
@@ -409,6 +409,7 @@ if (typeof module !== 'undefined' && module.exports) {
             if (!err2 && cRow) stats.lastUpdated = cRow.updated_at;
             resolve(stats);
           });
+
         });
       });
     });
