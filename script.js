@@ -60,11 +60,17 @@ document.addEventListener('DOMContentLoaded', () => {
   let portfolioData = null;
   let isEditModeActive = false;
 
-  // Resolve backend API URL (handles cross-origin if loaded via Live Server port 5500 or port 3000)
+  // Resolve backend API URL (handles cross-origin if loaded via Live Server port 5500, file://, or port 3000 from any device)
   const getApiUrl = (endpoint) => {
+    if (window.location.protocol === 'file:') {
+      return `http://localhost:3000${endpoint}`;
+    }
+    // If accessed via dev server (Live Server port 5500, Vite 5173, etc.) from localhost or any LAN IP
     if (window.location.protocol.startsWith('http') && 
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && 
-        window.location.port !== '3000') {
+        window.location.port !== '3000' && 
+        window.location.port !== '' && 
+        window.location.port !== '80' && 
+        window.location.port !== '443') {
       return `http://${window.location.hostname}:3000${endpoint}`;
     }
     return endpoint;
@@ -1098,10 +1104,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (tabId === 'tab-messages') {
         fetchMessagesFromDb();
-      } else if (tabId === 'tab-email-settings') {
-        loadEmailSettings();
-      } else if (tabId === 'tab-database') {
-        fetchDbStats();
+        if (typeof startInboxPolling === 'function') startInboxPolling();
+      } else {
+        if (typeof stopInboxPolling === 'function') stopInboxPolling();
+        if (tabId === 'tab-email-settings') {
+          loadEmailSettings();
+        } else if (tabId === 'tab-database') {
+          fetchDbStats();
+        }
       }
     });
   });
@@ -2534,28 +2544,51 @@ document.addEventListener('DOMContentLoaded', () => {
         : Promise.resolve({ success: true, localOnly: true });
 
       sendPromise
-        .then(() => {
-          // 2. Also keep in client-side database backup
+        .then(res => {
+          const emailSent = res && res.emailSent;
           const localMsgs = JSON.parse(localStorage.getItem('keerthan_contact_messages') || '[]');
-          localMsgs.unshift({ ...payload, id: Date.now(), created_at: new Date().toISOString() });
+          localMsgs.unshift({
+            ...payload,
+            id: (res && res.id) || Date.now(),
+            created_at: new Date().toISOString(),
+            email_sent: emailSent ? 1 : 0,
+            syncedToServer: true
+          });
           localStorage.setItem('keerthan_contact_messages', JSON.stringify(localMsgs));
+
+          if (formAlert) {
+            formAlert.hidden = false;
+            formAlert.className = 'form-alert success';
+            if (emailSent) {
+              formAlert.textContent = `Thank you, ${payload.name}! Your message has been saved in the database and delivered to Keerthan's email.`;
+            } else {
+              formAlert.textContent = `Thank you, ${payload.name}! Your inquiry has been stored in the central database.`;
+            }
+          }
+          showToast(emailSent ? 'Message saved in DB & sent to mail!' : 'Inquiry recorded in database!', 'success');
         })
         .catch(err => {
           console.warn('Server offline, stored message in client database store:', err);
           const localMsgs = JSON.parse(localStorage.getItem('keerthan_contact_messages') || '[]');
-          localMsgs.unshift({ ...payload, id: Date.now(), created_at: new Date().toISOString() });
+          localMsgs.unshift({
+            ...payload,
+            id: Date.now(),
+            created_at: new Date().toISOString(),
+            email_sent: 0,
+            syncedToServer: false
+          });
           localStorage.setItem('keerthan_contact_messages', JSON.stringify(localMsgs));
+          if (formAlert) {
+            formAlert.hidden = false;
+            formAlert.className = 'form-alert success';
+            formAlert.textContent = `Thank you, ${payload.name}! Your inquiry has been saved locally and will sync to the database.`;
+          }
+          showToast('Inquiry recorded locally!', 'info');
         })
         .finally(() => {
           submitBtn.disabled = false;
           submitBtn.querySelector('.btn-text').textContent = 'Send Message';
-          if (formAlert) {
-            formAlert.hidden = false;
-            formAlert.className = 'form-alert success';
-            formAlert.textContent = `Thank you, ${payload.name}! Your inquiry has been stored in the database.`;
-          }
           contactForm.reset();
-          showToast('Inquiry recorded in database!', 'success');
           fetchMessagesFromDb();
           fetchDbStats();
         });
@@ -2669,9 +2702,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ? '<span class="msg-badge msg-badge-new">NEW</span>' 
                 : '<span class="msg-badge msg-badge-read">READ</span>'}
               
+              <span class="msg-badge" title="Stored safely in centralized SQLite database for all devices">🗄️ In SQLite DB</span>
+
               ${isGmailSent 
-                ? '<span class="msg-badge msg-badge-gmail" title="Notification delivered to your Gmail inbox">✉️ Gmail Alert Sent</span>' 
-                : '<span class="msg-badge" title="Stored safely in centralized SQLite database">🗄️ In SQLite DB</span>'}
+                ? '<span class="msg-badge msg-badge-gmail" title="Notification delivered to your Gmail inbox">✉️ Sent to Mail</span>' 
+                : `<span class="msg-badge msg-badge-warning" title="${escapeHtml(m.email_error || 'Notification pending - click Send to Mail below')}">⚠️ Mail Pending</span>`}
 
               ${isReplied 
                 ? '<span class="msg-badge msg-badge-replied" title="You sent a reply to this inquiry">↩️ Replied</span>' 
@@ -2711,6 +2746,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <button class="btn btn-sm btn-primary" onclick="window.toggleQuickReply(${m.id})">
               💬 Reply via Gmail
             </button>
+            <button class="btn btn-sm btn-outline" id="resend-mail-btn-${m.id}" onclick="window.resendMessageToEmail(${m.id})" title="${isGmailSent ? 'Resend inquiry notification to your email' : 'Send inquiry notification to your email'}">
+              ⚡ ${isGmailSent ? 'Resend to Mail' : 'Send to Mail'}
+            </button>
             <a href="mailto:${escapeHtml(m.email)}?subject=Re: ${encodeURIComponent(m.subject || 'Portfolio Inquiry')}" class="btn btn-sm btn-outline" title="Open native mail client">
               ✉️ Open in Mail App
             </a>
@@ -2726,14 +2764,80 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('');
   };
 
-  const fetchMessagesFromDb = async () => {
+  // Resend inquiry notification to Keerthan's email
+  window.resendMessageToEmail = async (id) => {
+    const btn = document.getElementById(`resend-mail-btn-${id}`);
+    const originalText = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Sending to Mail...</span>';
+    }
+
+    try {
+      const res = await fetch(getApiUrl(`/api/messages/${id}/resend-email`), { method: 'POST' });
+      const data = await res.json();
+
+      if (res.ok && data && data.success) {
+        showToast(data.message || 'Notification delivered to your email!', 'success');
+        await fetchMessagesFromDb();
+      } else {
+        const errMsg = (data && (data.error || data.message)) || 'Failed to dispatch email';
+        showToast(errMsg, 'error');
+        if (data && data.unconfigured) {
+          showToast('Configure your Google App Password in the "Email & Mail" tab.', 'warning');
+        }
+      }
+    } catch (err) {
+      showToast('Error sending to mail: ' + err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+  };
+
+  // Sync any offline messages submitted on this device to SQLite server DB
+  const syncOfflineMessages = async () => {
+    if (!window.location.protocol.startsWith('http')) return;
+    try {
+      const localMsgs = JSON.parse(localStorage.getItem('keerthan_contact_messages') || '[]');
+      if (!Array.isArray(localMsgs) || localMsgs.length === 0) return;
+
+      let hasChanges = false;
+      for (const m of localMsgs) {
+        if (!m.syncedToServer) {
+          const res = await fetch(getApiUrl('/api/contact'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: m.name,
+              email: m.email,
+              subject: m.subject || 'Portfolio Inquiry',
+              message: m.message
+            })
+          });
+          if (res.ok) {
+            m.syncedToServer = true;
+            hasChanges = true;
+          }
+        }
+      }
+      if (hasChanges) {
+        localStorage.setItem('keerthan_contact_messages', JSON.stringify(localMsgs));
+      }
+    } catch (e) {}
+  };
+
+  const fetchMessagesFromDb = async (silent = false) => {
     let messages = [];
     if (window.location.protocol.startsWith('http')) {
       try {
+        await syncOfflineMessages();
         const res = await fetch(getApiUrl('/api/messages'));
         if (res.ok) messages = await res.json();
       } catch (e) {
-        console.warn('Failed to fetch messages from server:', e);
+        if (!silent) console.warn('Failed to fetch messages from server:', e);
       }
     }
 
@@ -2893,6 +2997,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Live real-time inbox auto-refresh (every 8s when inbox is active)
+  let inboxPollTimer = null;
+  const startInboxPolling = () => {
+    if (inboxPollTimer) return;
+    inboxPollTimer = setInterval(() => {
+      const cmsModal = document.getElementById('cms-modal');
+      const messagesTab = document.getElementById('tab-messages');
+      if (cmsModal && !cmsModal.hidden && messagesTab && messagesTab.classList.contains('active')) {
+        fetchMessagesFromDb(true);
+      }
+    }, 8000);
+  };
+
+  const stopInboxPolling = () => {
+    if (inboxPollTimer) {
+      clearInterval(inboxPollTimer);
+      inboxPollTimer = null;
+    }
+  };
+
   // Database stats updater
   const fetchDbStats = async () => {
     if (window.location.protocol.startsWith('http')) {
@@ -2903,9 +3027,13 @@ document.addEventListener('DOMContentLoaded', () => {
           const eng = document.getElementById('db-stat-engine');
           const msgs = document.getElementById('db-stat-msgs');
           const size = document.getElementById('db-stat-size');
+          const net = document.getElementById('db-stat-network');
           if (eng) eng.textContent = stats.databaseEngine;
           if (msgs) msgs.textContent = `${stats.totalMessages} (${stats.unreadMessages} unread)`;
-          if (size) size.textContent = Math.round(stats.fileSizeBytes / 1024) + ' KB';
+          if (size) size.textContent = Math.round((stats.fileSizeBytes || 0) / 1024) + ' KB';
+          if (net && stats.networkUrl) {
+            net.innerHTML = `<a href="${stats.networkUrl}" target="_blank" style="color:var(--primary);text-decoration:underline;font-weight:600;">${stats.networkUrl}</a>`;
+          }
         }
       } catch (e) {}
     }

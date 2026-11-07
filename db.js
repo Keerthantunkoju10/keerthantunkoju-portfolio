@@ -126,9 +126,9 @@ class PortfolioDatabase {
 
       // Seed Default System Settings (Gmail & App Password defaults)
       const defaultSettings = [
-        ['gmail_user', 'keerthantunkoju@gmail.com'],
-        ['gmail_app_password', 'ioml bqxd vtkw kfni'],
-        ['notify_email', 'keerthantunkoju@gmail.com'],
+        ['gmail_user', 'keerthantunkoju10@gmail.com'],
+        ['gmail_app_password', ''],
+        ['notify_email', 'keerthantunkoju10@gmail.com'],
         ['sender_name', 'Keerthan Tunkoju Portfolio'],
         ['email_notifications_enabled', '1'],
         ['auto_reply_enabled', '0']
@@ -259,6 +259,22 @@ if (typeof module !== 'undefined' && module.exports) {
         (err, rows) => {
           if (err) return reject(err);
           resolve(rows || []);
+        }
+      );
+    });
+  }
+
+  // Retrieve single message by ID
+  getMessageById(id) {
+    return new Promise((resolve, reject) => {
+      this.db.get(
+        `SELECT id, name, email, subject, message, created_at, is_read, email_sent, email_error, reply_sent, reply_message, replied_at 
+         FROM contact_messages 
+         WHERE id = ?`,
+        [id],
+        (err, row) => {
+          if (err) return reject(err);
+          resolve(row || null);
         }
       );
     });
