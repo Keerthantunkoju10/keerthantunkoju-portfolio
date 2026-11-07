@@ -21,6 +21,13 @@
 
 # PDF Resume headers - optimize inline viewing & downloading
 [[headers]]
+  for = "/KeerthanTunkoju.pdf"
+  [headers.values]
+    Content-Type = "application/pdf"
+    Content-Disposition = "inline; filename=\"KeerthanTunkoju.pdf\""
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
   for = "/Keerthan_Tunkoju_Resume.pdf"
   [headers.values]
     Content-Type = "application/pdf"

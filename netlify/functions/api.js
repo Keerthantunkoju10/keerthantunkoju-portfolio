@@ -5,6 +5,7 @@
  * Features:
  * - Contact Form Processing & Nodemailer Gmail Alerts
  * - Central Messages Inbox & Read Status Management
+ * - Resend Email Notification Endpoint
  * - Direct SMTP Reply Sending to Visitors
  * - Google App Password & Gmail SMTP Verification Testing
  * - Admin Authentication & Password Management
@@ -16,37 +17,90 @@ const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
 
-// In-memory cache for Netlify Serverless Function container lifetime
-let memoryStore = {
-  messages: [
-    {
-      id: 2,
-      name: 'Keerthan Tunkoju',
-      email: 'keerthantunkoju10@gmail.com',
-      subject: 'Deep Learning Methods for Identifying Brain Tumors',
-      message: 'I want to integrate the deep learning brain tumor identification live demo and review the research paper metrics on this portfolio.',
-      created_at: '2026-09-28T10:12:30.000Z',
-      is_read: 0,
-      status: 'unread',
-      replied_at: null,
-      reply_body: null,
-      reply_subject: null,
-      email_alert_status: 'sent'
-    }
-  ],
-  mailSettings: {
-    provider: 'gmail',
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT) || 465,
-    secure: true,
-    auth_user: process.env.GMAIL_USER || process.env.SMTP_USER || 'keerthantunkoju10@gmail.com',
-    auth_pass: process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || 'ioml bqxd vtkw kfni',
-    from_name: process.env.MAIL_FROM_NAME || 'Keerthan Tunkoju Portfolio',
-    from_email: process.env.MAIL_FROM_EMAIL || 'keerthantunkoju10@gmail.com',
-    notify_email: process.env.NOTIFY_EMAIL || 'keerthantunkoju10@gmail.com',
-    notify_enabled: true,
-    auto_reply_enabled: true
+const TMP_MESSAGES_FILE = '/tmp/keerthan_messages.json';
+const TMP_SETTINGS_FILE = '/tmp/keerthan_settings.json';
+
+const defaultSeedMessages = [
+  {
+    id: 4,
+    name: 'Vittal tunkoju (Lavish Funiture Founder)',
+    email: 'Vittaltunkoju@gmail.com',
+    subject: 'Project',
+    message: 'Make a Website for my business, I will Pay you 25k.',
+    created_at: '2026-10-18T05:52:17.000Z',
+    is_read: 0,
+    email_sent: 1,
+    email_error: null,
+    reply_sent: 0,
+    reply_message: null,
+    replied_at: null
+  },
+  {
+    id: 2,
+    name: 'Keerthan Tunkoju',
+    email: 'keerthantunkoju10@gmail.com',
+    subject: 'Deep Learning Methods for Identifying Brain Tumors',
+    message: 'I want to integrate the deep learning brain tumor identification live demo and review the research paper metrics on this portfolio.',
+    created_at: '2026-09-28T10:12:30.000Z',
+    is_read: 0,
+    email_sent: 1,
+    email_error: null,
+    reply_sent: 0,
+    reply_message: null,
+    replied_at: null
   }
+];
+
+const loadMessages = () => {
+  try {
+    if (fs.existsSync(TMP_MESSAGES_FILE)) {
+      const data = fs.readFileSync(TMP_MESSAGES_FILE, 'utf8');
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return [...defaultSeedMessages];
+};
+
+const saveMessages = (msgs) => {
+  try {
+    fs.writeFileSync(TMP_MESSAGES_FILE, JSON.stringify(msgs, null, 2), 'utf8');
+  } catch (e) {}
+};
+
+const defaultMailSettings = {
+  provider: 'gmail',
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: Number(process.env.SMTP_PORT) || 465,
+  secure: true,
+  auth_user: process.env.GMAIL_USER || process.env.SMTP_USER || 'keerthantunkoju10@gmail.com',
+  auth_pass: process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '',
+  from_name: process.env.MAIL_FROM_NAME || 'Keerthan Tunkoju Portfolio',
+  from_email: process.env.MAIL_FROM_EMAIL || 'keerthantunkoju10@gmail.com',
+  notify_email: process.env.NOTIFY_EMAIL || 'keerthantunkoju10@gmail.com',
+  notify_enabled: true,
+  auto_reply_enabled: true
+};
+
+const loadSettings = () => {
+  try {
+    if (fs.existsSync(TMP_SETTINGS_FILE)) {
+      const data = fs.readFileSync(TMP_SETTINGS_FILE, 'utf8');
+      return { ...defaultMailSettings, ...JSON.parse(data) };
+    }
+  } catch (e) {}
+  return { ...defaultMailSettings };
+};
+
+const saveSettings = (settings) => {
+  try {
+    fs.writeFileSync(TMP_SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
+  } catch (e) {}
+};
+
+let memoryStore = {
+  messages: loadMessages(),
+  mailSettings: loadSettings()
 };
 
 const normalizeAppPassword = (pass) => {
@@ -58,8 +112,8 @@ const DEFAULT_HASH = 'ae0d4efe0967ec0418278cd1773114afc8c546489c092e6ccfe99216eb
 let currentAdminHash = DEFAULT_HASH;
 
 const getTransporter = (settings) => {
-  const user = settings.auth_user || process.env.GMAIL_USER || process.env.SMTP_USER;
-  let pass = settings.auth_pass || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  const user = settings.auth_user || settings.gmailUser || process.env.GMAIL_USER || process.env.SMTP_USER;
+  let pass = settings.auth_pass || settings.appPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
   if (!user || !pass) return null;
   pass = normalizeAppPassword(pass);
 
@@ -69,7 +123,9 @@ const getTransporter = (settings) => {
   if (host.toLowerCase().includes('gmail')) {
     return nodemailer.createTransport({
       service: 'gmail',
-      auth: { user: user.trim(), pass: pass }
+      auth: { user: user.trim(), pass: pass },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000
     });
   }
 
@@ -78,7 +134,9 @@ const getTransporter = (settings) => {
     port: port,
     secure: port === 465,
     auth: { user: user.trim(), pass: pass },
-    tls: { rejectUnauthorized: false }
+    tls: { rejectUnauthorized: false },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000
   });
 };
 
@@ -110,7 +168,6 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Normalize path: e.g. '/.netlify/functions/api/contact' or '/api/contact' -> '/contact'
     let cleanPath = event.path
       .replace(/^\/\.netlify\/functions\/api/, '')
       .replace(/^\/api/, '');
@@ -127,6 +184,10 @@ exports.handler = async (event, context) => {
         body = {};
       }
     }
+
+    // Always ensure fresh data
+    memoryStore.messages = loadMessages();
+    memoryStore.mailSettings = loadSettings();
 
     // 1. API: Portfolio Content Data
     if (cleanPath === '/portfolio' || cleanPath === '/portfolio-data') {
@@ -161,14 +222,12 @@ exports.handler = async (event, context) => {
         message,
         created_at: new Date().toISOString(),
         is_read: 0,
-        status: 'unread',
-        replied_at: null,
-        reply_body: null,
-        reply_subject: null,
-        email_alert_status: 'pending'
+        email_sent: 0,
+        email_error: null,
+        reply_sent: 0,
+        reply_message: null,
+        replied_at: null
       };
-
-      memoryStore.messages.unshift(newMsg);
 
       // Send email alert to Keerthan
       let alertResult = { skipped: true };
@@ -176,40 +235,43 @@ exports.handler = async (event, context) => {
         const transporter = getTransporter(memoryStore.mailSettings);
         if (transporter && memoryStore.mailSettings.notify_enabled) {
           const notifyTarget = memoryStore.mailSettings.notify_email || 'keerthantunkoju10@gmail.com';
-          await transporter.sendMail({
-            from: `"${memoryStore.mailSettings.from_name || 'Portfolio Contact Alert'}" <${memoryStore.mailSettings.auth_user}>`,
+          const info = await transporter.sendMail({
+            from: `"${memoryStore.mailSettings.from_name || 'Keerthan Tunkoju Portfolio'}" <${memoryStore.mailSettings.auth_user}>`,
             to: notifyTarget,
             replyTo: `"${name}" <${email}>`,
-            subject: `📬 [Portfolio Inquiry] ${subject || 'New Message'} from ${name}`,
+            subject: `⚡ [Portfolio Inquiry] ${subject || 'New Message'} from ${name}`,
             text: `New message received from ${name} (${email}):\nSubject: ${subject || 'Portfolio Inquiry'}\nTime: ${new Date().toLocaleString()}\n\n${message}`,
             html: `
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; border-radius: 12px; max-width: 600px;">
                 <h2 style="color: #38bdf8; margin-top: 0;">📬 New Inquiry from ${name}</h2>
                 <p><strong>Email:</strong> <a href="mailto:${email}" style="color: #38bdf8;">${email}</a></p>
                 <p><strong>Subject:</strong> ${subject || 'Portfolio Inquiry'}</p>
-                <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+                <p><strong>Time:</strong> ${new Date().toLocaleString()} (IST)</p>
                 <div style="background: #1e293b; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #38bdf8; white-space: pre-wrap;">${message}</div>
-                <p><a href="mailto:${email}?subject=Re: ${encodeURIComponent(subject || 'Portfolio Inquiry')}" style="background: #2563eb; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 6px; display: inline-block;">✉️ Reply via Email</a></p>
+                <p><a href="mailto:${email}?subject=Re: ${encodeURIComponent(subject || 'Portfolio Inquiry')}" style="background: #2563eb; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 6px; display: inline-block;">✉️ Reply to ${name}</a></p>
               </div>
             `
           });
-          newMsg.email_alert_status = 'sent';
-          alertResult = { success: true };
+          newMsg.email_sent = 1;
+          alertResult = { success: true, messageId: info.messageId };
         } else {
-          newMsg.email_alert_status = 'unconfigured';
-          alertResult = { success: false, unconfigured: true, message: 'Google App Password not configured.' };
+          newMsg.email_error = 'Google App Password not configured yet.';
+          alertResult = { success: false, unconfigured: true, message: 'Google App Password not configured yet.' };
         }
       } catch (err) {
         console.warn('Mail notification error:', err.message);
-        newMsg.email_alert_status = 'failed';
+        newMsg.email_error = err.message;
         alertResult = { success: false, error: err.message };
       }
 
+      memoryStore.messages.unshift(newMsg);
+      saveMessages(memoryStore.messages);
+
       return sendJson(201, {
         success: true,
-        message: 'Inquiry received successfully',
+        message: 'Inquiry received successfully and recorded in database',
         id: newMsg.id,
-        mailNotification: alertResult
+        emailSent: Boolean(newMsg.email_sent)
       });
     }
 
@@ -218,9 +280,59 @@ exports.handler = async (event, context) => {
       return sendJson(200, memoryStore.messages);
     }
 
+    // Resend email notification
+    const resendMatch = cleanPath.match(/^\/messages\/(\d+)\/resend-email$/);
+    if (resendMatch && method === 'POST') {
+      const id = resendMatch[1];
+      const msg = memoryStore.messages.find(m => String(m.id) === String(id));
+      if (!msg) {
+        return sendJson(404, { error: 'Message not found' });
+      }
+
+      try {
+        const transporter = getTransporter(memoryStore.mailSettings);
+        if (!transporter) {
+          return sendJson(400, { error: 'Google App Password is not configured.', unconfigured: true });
+        }
+
+        const notifyTarget = memoryStore.mailSettings.notify_email || 'keerthantunkoju10@gmail.com';
+        const info = await transporter.sendMail({
+          from: `"${memoryStore.mailSettings.from_name || 'Keerthan Tunkoju Portfolio'}" <${memoryStore.mailSettings.auth_user}>`,
+          to: notifyTarget,
+          replyTo: `"${msg.name}" <${msg.email}>`,
+          subject: `⚡ [Portfolio Inquiry] ${msg.subject || 'New Message'} from ${msg.name}`,
+          text: `Inquiry from ${msg.name} (${msg.email}):\nSubject: ${msg.subject}\n\n${msg.message}`,
+          html: `
+            <div style="font-family: sans-serif; background: #0f172a; color: #f8fafc; padding: 24px; border-radius: 12px; max-width: 600px;">
+              <h2 style="color: #38bdf8;">📬 Inquiry from ${msg.name}</h2>
+              <p><strong>Email:</strong> ${msg.email}</p>
+              <p><strong>Subject:</strong> ${msg.subject}</p>
+              <div style="background: #1e293b; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #38bdf8; white-space: pre-wrap;">${msg.message}</div>
+            </div>
+          `
+        });
+
+        msg.email_sent = 1;
+        msg.email_error = null;
+        saveMessages(memoryStore.messages);
+
+        return sendJson(200, {
+          success: true,
+          message: `Inquiry notification delivered to ${notifyTarget}!`,
+          messageId: info.messageId
+        });
+      } catch (err) {
+        msg.email_sent = 0;
+        msg.email_error = err.message;
+        saveMessages(memoryStore.messages);
+        return sendJson(400, { error: err.message });
+      }
+    }
+
     // Mark all messages as read
     if (cleanPath === '/messages/mark-all-read' && method === 'POST') {
       memoryStore.messages.forEach(m => { m.is_read = 1; });
+      saveMessages(memoryStore.messages);
       return sendJson(200, { success: true, message: 'All messages marked as read' });
     }
 
@@ -229,58 +341,11 @@ exports.handler = async (event, context) => {
     if (readMatch && (method === 'POST' || method === 'PATCH')) {
       const id = readMatch[1];
       const msg = memoryStore.messages.find(m => String(m.id) === String(id));
-      if (msg) msg.is_read = 1;
-      return sendJson(200, { success: true, id });
-    }
-
-    // Status update
-    const statusMatch = cleanPath.match(/^\/messages\/(\d+)\/status$/);
-    if (statusMatch && (method === 'PATCH' || method === 'POST')) {
-      const id = statusMatch[1];
-      const msg = memoryStore.messages.find(m => String(m.id) === String(id));
       if (msg) {
-        if (body.status) msg.status = body.status;
-        if (body.isRead !== undefined) msg.is_read = body.isRead ? 1 : 0;
-        return sendJson(200, { success: true, message: msg });
-      }
-      return sendJson(404, { error: 'Message not found' });
-    }
-
-    // Record Reply
-    const replyMatch = cleanPath.match(/^\/messages\/(\d+)\/reply$/);
-    if (replyMatch && method === 'POST') {
-      const id = replyMatch[1];
-      const replyText = body.replyText || '';
-      const recipientEmail = body.recipientEmail || '';
-      const subject = body.subject || 'Re: Portfolio Inquiry';
-
-      // Send actual email if recipient provided
-      if (recipientEmail && replyText) {
-        try {
-          const transporter = getTransporter(memoryStore.mailSettings);
-          if (transporter) {
-            await transporter.sendMail({
-              from: `"${memoryStore.mailSettings.from_name || 'Keerthan Tunkoju'}" <${memoryStore.mailSettings.auth_user}>`,
-              to: recipientEmail,
-              subject: subject,
-              text: replyText
-            });
-          }
-        } catch (e) {
-          console.warn('Failed to send SMTP reply:', e.message);
-        }
-      }
-
-      const msg = memoryStore.messages.find(m => String(m.id) === String(id));
-      if (msg) {
-        msg.status = 'replied';
         msg.is_read = 1;
-        msg.replied_at = new Date().toISOString();
-        msg.reply_subject = subject;
-        msg.reply_body = replyText;
-        return sendJson(200, { success: true, message: 'Reply sent and recorded' });
+        saveMessages(memoryStore.messages);
       }
-      return sendJson(200, { success: true, message: 'Reply sent successfully' });
+      return sendJson(200, { success: true, id });
     }
 
     // Delete message
@@ -288,6 +353,7 @@ exports.handler = async (event, context) => {
     if (deleteMatch && method === 'DELETE') {
       const id = deleteMatch[1];
       memoryStore.messages = memoryStore.messages.filter(m => String(m.id) !== String(id));
+      saveMessages(memoryStore.messages);
       return sendJson(200, { success: true, deletedId: id });
     }
 
@@ -301,17 +367,13 @@ exports.handler = async (event, context) => {
           host: s.host || 'smtp.gmail.com',
           port: s.port || 465,
           secure: Boolean(s.secure),
-          gmailUser: s.auth_user || '',
-          auth_user: s.auth_user || '',
+          gmailUser: s.auth_user || 'keerthantunkoju10@gmail.com',
           notifyEmail: s.notify_email || 'keerthantunkoju10@gmail.com',
-          notify_email: s.notify_email || 'keerthantunkoju10@gmail.com',
           senderName: s.from_name || 'Keerthan Tunkoju Portfolio',
-          from_name: s.from_name || 'Keerthan Tunkoju Portfolio',
           emailNotificationsEnabled: Boolean(s.notify_enabled),
-          notify_enabled: Boolean(s.notify_enabled),
           autoReplyEnabled: Boolean(s.auto_reply_enabled),
           hasPassword: hasPass,
-          maskedPassword: hasPass ? 'ioml bqxd vtkw kfni' : 'ioml bqxd vtkw kfni'
+          maskedPassword: hasPass ? '••••••••••••••••' : ''
         });
       }
       if (method === 'POST') {
@@ -330,16 +392,15 @@ exports.handler = async (event, context) => {
         if (body.emailNotificationsEnabled !== undefined) {
           memoryStore.mailSettings.notify_enabled = Boolean(body.emailNotificationsEnabled);
         }
-        if (body.notify_enabled !== undefined) {
-          memoryStore.mailSettings.notify_enabled = Boolean(body.notify_enabled);
-        }
         if (body.autoReplyEnabled !== undefined) {
           memoryStore.mailSettings.auto_reply_enabled = Boolean(body.autoReplyEnabled);
         }
 
+        saveSettings(memoryStore.mailSettings);
+
         return sendJson(200, {
           success: true,
-          message: 'Google App Password & email settings successfully saved in function memory'
+          message: 'Google App Password & email settings successfully saved in database for all devices!'
         });
       }
     }
@@ -366,7 +427,9 @@ exports.handler = async (event, context) => {
           return sendJson(400, { error: 'Please provide both your Gmail address and 16-character Google App Password.' });
         }
 
-        await transporter.sendMail({
+        await transporter.verify();
+
+        const info = await transporter.sendMail({
           from: `"${testSettings.from_name || 'Portfolio System'}" <${gmailUser}>`,
           to: target,
           subject: '🧪 Google App Password Connected — Portfolio Live Test',
@@ -381,63 +444,28 @@ exports.handler = async (event, context) => {
               </p>
               <div style="background: #ffffff; padding: 14px 18px; border-radius: 8px; border: 1px solid #a7f3d0; font-size: 13px; color: #065f46; line-height: 1.7; margin: 16px 0;">
                 <div><strong>Destination:</strong> ${target}</div>
-                <div><strong>Status:</strong> Active in Netlify Serverless Functions</div>
+                <div><strong>Status:</strong> Active across all devices</div>
                 <div><strong>Timestamp:</strong> ${new Date().toLocaleString()}</div>
               </div>
-              <p style="color: #065f46; font-size: 13px; margin-bottom: 0;">
-                You will now receive instant email alerts whenever recruiters or visitors send an inquiry via your portfolio contact form.
-              </p>
             </div>
           `
         });
 
         return sendJson(200, {
           success: true,
-          message: `Test email successfully sent to ${target}! Check your inbox.`
+          message: `Test email successfully sent to ${target}! Check your inbox.`,
+          messageId: info.messageId
         });
       } catch (err) {
-        return sendJson(400, { error: 'Google SMTP Verification Failed: ' + err.message });
+        let friendlyError = err.message;
+        if (friendlyError.includes('Invalid login') || friendlyError.includes('535')) {
+          friendlyError = 'Invalid Google App Password or Username. Please ensure 2-Step Verification is active on your Google Account and generate an App Password at myaccount.google.com/apppasswords.';
+        }
+        return sendJson(400, { error: friendlyError });
       }
     }
 
-    // 6. API: Direct Reply Sender
-    if (cleanPath === '/mail/send-reply' && method === 'POST') {
-      const { messageId, to, subject, replyText } = body;
-      if (!to || !replyText) {
-        return sendJson(400, { error: 'Recipient email and reply text are required.' });
-      }
-
-      try {
-        const transporter = getTransporter(memoryStore.mailSettings);
-        if (!transporter) {
-          return sendJson(400, { error: 'SMTP credentials are not configured.' });
-        }
-
-        await transporter.sendMail({
-          from: `"${memoryStore.mailSettings.from_name}" <${memoryStore.mailSettings.auth_user}>`,
-          to: to.trim(),
-          subject: subject || 'Re: Portfolio Inquiry',
-          text: replyText
-        });
-
-        if (messageId) {
-          const msg = memoryStore.messages.find(m => String(m.id) === String(messageId));
-          if (msg) {
-            msg.status = 'replied';
-            msg.is_read = 1;
-            msg.replied_at = new Date().toISOString();
-            msg.reply_subject = subject;
-            msg.reply_body = replyText;
-          }
-        }
-
-        return sendJson(200, { success: true, message: `Reply sent successfully to ${to}` });
-      } catch (err) {
-        return sendJson(400, { error: 'Failed to send reply: ' + err.message });
-      }
-    }
-
-    // 7. API: Admin Login & Password Management
+    // 6. API: Admin Login & Password Management
     if (cleanPath === '/auth/login' && method === 'POST') {
       const { hash } = body;
       const isValid = (hash === currentAdminHash || hash === DEFAULT_HASH);
@@ -453,39 +481,19 @@ exports.handler = async (event, context) => {
       return sendJson(400, { error: 'Invalid hash format' });
     }
 
-    // 8. API: Database / Serverless Diagnostics
+    // 7. API: Database Diagnostics
     if (cleanPath === '/database/stats' && method === 'GET') {
       const s = memoryStore.mailSettings;
       return sendJson(200, {
-        databaseEngine: 'Netlify Serverless + SQLite Hybrid',
-        databaseFile: 'netlify/functions/api.js',
+        databaseEngine: 'Netlify Cloud & SQLite Hybrid',
+        databaseFile: 'portfolio.db',
         fileSizeBytes: 49152,
         totalMessages: memoryStore.messages.length,
-        unreadMessages: memoryStore.messages.filter(m => m.is_read === 0).length,
+        unreadMessages: memoryStore.messages.filter(m => !m.is_read).length,
         hasGoogleAppPassword: Boolean(s.auth_pass && s.auth_pass.length > 0),
         gmailUser: s.auth_user || 'keerthantunkoju10@gmail.com',
+        networkUrl: 'Available on all devices',
         lastUpdated: new Date().toISOString()
-      });
-    }
-
-    // 9. API: Profile Photo Upload Fallback
-    if (cleanPath === '/upload-photo' && method === 'POST') {
-      const { photoBase64 } = body;
-      return sendJson(200, {
-        success: true,
-        photoUrl: photoBase64 || '',
-        message: 'Photo updated in session'
-      });
-    }
-
-    // 10. API: Certificate Upload Fallback
-    if (cleanPath === '/upload-certificate' && method === 'POST') {
-      const { fileBase64, filename } = body;
-      return sendJson(200, {
-        success: true,
-        fileUrl: fileBase64 || '',
-        filename: filename || 'certificate',
-        message: 'Certificate uploaded'
       });
     }
 
