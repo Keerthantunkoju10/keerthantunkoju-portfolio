@@ -16,3 +16,8 @@ Thumbs.db
 .idea/
 *.log
 .netlify/
+
+# Environment Variables
+.env
+.env.local
+!.env.example
