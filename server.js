@@ -524,7 +524,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ==========================================
-  // 5. API: Database Diagnostics & Network URLs
+  // 5. API: Database Diagnostics, Download & Network URLs
   // ==========================================
   if (url.pathname === '/api/database/stats' && req.method === 'GET') {
     try {
@@ -536,6 +536,24 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, stats);
     } catch (err) {
       return sendJson(res, 500, { error: err.message });
+    }
+  }
+
+  // Download active SQLite database file
+  if (url.pathname === '/api/database/download' && req.method === 'GET') {
+    const dbPath = path.join(__dirname, 'portfolio.db');
+    if (fs.existsSync(dbPath)) {
+      const stat = fs.statSync(dbPath);
+      res.writeHead(200, {
+        'Content-Type': 'application/x-sqlite3',
+        'Content-Length': stat.size,
+        'Content-Disposition': 'attachment; filename="portfolio.db"',
+        'Access-Control-Allow-Origin': '*'
+      });
+      const stream = fs.createReadStream(dbPath);
+      return stream.pipe(res);
+    } else {
+      return sendJson(res, 404, { error: 'Database file not found' });
     }
   }
 

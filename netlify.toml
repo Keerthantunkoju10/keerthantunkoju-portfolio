@@ -4,6 +4,9 @@
   publish = "."
   functions = "netlify/functions"
 
+[functions]
+  included_files = ["portfolio.db", "data.js"]
+
 # Route API requests to the Netlify Serverless Function
 [[redirects]]
   from = "/api/*"

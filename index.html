@@ -700,6 +700,10 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
                 <span>Download data.js</span>
               </button>
+              <a href="/api/database/download" id="cms-export-db-btn" class="btn btn-outline" download="portfolio.db" style="display:inline-flex; align-items:center; gap:0.5rem; text-decoration:none;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                <span>Download portfolio.db</span>
+              </a>
               <button id="cms-copy-json-btn" class="btn btn-outline">Copy JSON</button>
             </div>
           </div>
@@ -968,9 +972,15 @@
 
             <div style="margin-top: 1.5rem;">
               <p class="backup-desc">Database File: <code>portfolio.db</code> (Persistent relational database with transactions)</p>
-              <button id="db-resync-btn" class="btn btn-primary" style="margin-top: 0.75rem;">
-                <span>🔄 Sync with SQLite Database</span>
-              </button>
+              <div style="margin-top: 0.75rem; display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+                <button id="db-resync-btn" class="btn btn-primary">
+                  <span>🔄 Sync with SQLite Database</span>
+                </button>
+                <a href="/api/database/download" class="btn btn-secondary" download="portfolio.db" style="display:inline-flex; align-items:center; gap:0.5rem; text-decoration:none;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                  <span>📥 Download Live portfolio.db</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
