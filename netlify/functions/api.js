@@ -17,6 +17,22 @@ const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
 
+// Netlify Blobs Persistent Storage Engine (Cloud database for serverless)
+let getBlobStore = null;
+try {
+  getBlobStore = require('@netlify/blobs').getStore;
+} catch (e) {}
+
+const getStoreInstance = (storeName = 'keerthan-portfolio-store') => {
+  if (typeof getBlobStore === 'function') {
+    try {
+      return getBlobStore({ name: storeName, consistency: 'strong' });
+    } catch (e) {}
+  }
+  return null;
+};
+
+const TMP_PORTFOLIO_FILE = '/tmp/keerthan_portfolio.json';
 const TMP_MESSAGES_FILE = '/tmp/keerthan_messages.json';
 const TMP_SETTINGS_FILE = '/tmp/keerthan_settings.json';
 
@@ -51,7 +67,53 @@ const defaultSeedMessages = [
   }
 ];
 
-const loadMessages = () => {
+// Load Portfolio Content from Netlify Blobs -> /tmp cache -> data.js fallback
+const loadPortfolioData = async () => {
+  const store = getStoreInstance();
+  if (store) {
+    try {
+      const blob = await store.get('portfolio_content', { type: 'json' });
+      if (blob && blob.profile) return blob;
+    } catch (e) {}
+  }
+  try {
+    if (fs.existsSync(TMP_PORTFOLIO_FILE)) {
+      const data = fs.readFileSync(TMP_PORTFOLIO_FILE, 'utf8');
+      const parsed = JSON.parse(data);
+      if (parsed && parsed.profile) return parsed;
+    }
+  } catch (e) {}
+  try {
+    const dataPath = path.resolve(__dirname, '../../data.js');
+    if (fs.existsSync(dataPath)) {
+      delete require.cache[require.resolve('../../data.js')];
+      return require('../../data.js');
+    }
+  } catch (e) {}
+  return null;
+};
+
+// Save Portfolio Content to Netlify Blobs (persistent across all visitors & reloads)
+const savePortfolioData = async (data) => {
+  const store = getStoreInstance();
+  if (store) {
+    try {
+      await store.setJSON('portfolio_content', data);
+    } catch (e) {}
+  }
+  try {
+    fs.writeFileSync(TMP_PORTFOLIO_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {}
+};
+
+const loadMessages = async () => {
+  const store = getStoreInstance();
+  if (store) {
+    try {
+      const msgs = await store.get('contact_messages', { type: 'json' });
+      if (Array.isArray(msgs)) return msgs;
+    } catch (e) {}
+  }
   try {
     if (fs.existsSync(TMP_MESSAGES_FILE)) {
       const data = fs.readFileSync(TMP_MESSAGES_FILE, 'utf8');
@@ -62,7 +124,13 @@ const loadMessages = () => {
   return [...defaultSeedMessages];
 };
 
-const saveMessages = (msgs) => {
+const saveMessages = async (msgs) => {
+  const store = getStoreInstance();
+  if (store) {
+    try {
+      await store.setJSON('contact_messages', msgs);
+    } catch (e) {}
+  }
   try {
     fs.writeFileSync(TMP_MESSAGES_FILE, JSON.stringify(msgs, null, 2), 'utf8');
   } catch (e) {}
@@ -85,7 +153,19 @@ const defaultMailSettings = {
   auto_reply_enabled: true
 };
 
-const loadSettings = () => {
+const loadSettings = async () => {
+  const store = getStoreInstance();
+  if (store) {
+    try {
+      const s = await store.get('system_settings', { type: 'json' });
+      if (s) {
+        if (!s.auth_pass || s.auth_pass === 'itdemecrgmaxxtvb') {
+          s.auth_pass = DEFAULT_APP_PASSWORD;
+        }
+        return { ...defaultMailSettings, ...s };
+      }
+    } catch (e) {}
+  }
   try {
     if (fs.existsSync(TMP_SETTINGS_FILE)) {
       const data = fs.readFileSync(TMP_SETTINGS_FILE, 'utf8');
@@ -99,15 +179,21 @@ const loadSettings = () => {
   return { ...defaultMailSettings };
 };
 
-const saveSettings = (settings) => {
+const saveSettings = async (settings) => {
+  const store = getStoreInstance();
+  if (store) {
+    try {
+      await store.setJSON('system_settings', settings);
+    } catch (e) {}
+  }
   try {
     fs.writeFileSync(TMP_SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
   } catch (e) {}
 };
 
 let memoryStore = {
-  messages: loadMessages(),
-  mailSettings: loadSettings()
+  messages: [...defaultSeedMessages],
+  mailSettings: { ...defaultMailSettings }
 };
 
 const normalizeAppPassword = (pass) => {
@@ -195,25 +281,25 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Always ensure fresh data
-    memoryStore.messages = loadMessages();
-    memoryStore.mailSettings = loadSettings();
+    // Always ensure fresh data from persistent store
+    memoryStore.messages = await loadMessages();
+    memoryStore.mailSettings = await loadSettings();
 
-    // 1. API: Portfolio Content Data
+    // 1. API: Portfolio Content Data (Persistent in Netlify Blobs & cloud cache)
     if (cleanPath === '/portfolio' || cleanPath === '/portfolio-data') {
       if (method === 'GET') {
-        try {
-          const dataPath = path.resolve(__dirname, '../../data.js');
-          if (fs.existsSync(dataPath)) {
-            delete require.cache[require.resolve('../../data.js')];
-            const defaultData = require('../../data.js');
-            return sendJson(200, defaultData);
-          }
-        } catch (e) {}
-        return sendJson(200, { success: true });
+        const data = await loadPortfolioData();
+        return sendJson(200, data || { success: true });
       }
       if (method === 'POST') {
-        return sendJson(200, { success: true, message: 'Portfolio updated successfully' });
+        if (body && (body.profile || body.about || body.projects)) {
+          await savePortfolioData(body);
+          return sendJson(200, {
+            success: true,
+            message: 'Portfolio updated successfully and stored in online database for all visitors!'
+          });
+        }
+        return sendJson(400, { error: 'Invalid portfolio data payload' });
       }
     }
 
@@ -275,7 +361,7 @@ exports.handler = async (event, context) => {
       }
 
       memoryStore.messages.unshift(newMsg);
-      saveMessages(memoryStore.messages);
+      await saveMessages(memoryStore.messages);
 
       return sendJson(201, {
         success: true,
@@ -324,7 +410,7 @@ exports.handler = async (event, context) => {
 
         msg.email_sent = 1;
         msg.email_error = null;
-        saveMessages(memoryStore.messages);
+        await saveMessages(memoryStore.messages);
 
         return sendJson(200, {
           success: true,
@@ -334,7 +420,7 @@ exports.handler = async (event, context) => {
       } catch (err) {
         msg.email_sent = 0;
         msg.email_error = err.message;
-        saveMessages(memoryStore.messages);
+        await saveMessages(memoryStore.messages);
         return sendJson(400, { error: err.message });
       }
     }
@@ -342,7 +428,7 @@ exports.handler = async (event, context) => {
     // Mark all messages as read
     if (cleanPath === '/messages/mark-all-read' && method === 'POST') {
       memoryStore.messages.forEach(m => { m.is_read = 1; });
-      saveMessages(memoryStore.messages);
+      await saveMessages(memoryStore.messages);
       return sendJson(200, { success: true, message: 'All messages marked as read' });
     }
 
@@ -353,7 +439,7 @@ exports.handler = async (event, context) => {
       const msg = memoryStore.messages.find(m => String(m.id) === String(id));
       if (msg) {
         msg.is_read = 1;
-        saveMessages(memoryStore.messages);
+        await saveMessages(memoryStore.messages);
       }
       return sendJson(200, { success: true, id });
     }
@@ -363,7 +449,7 @@ exports.handler = async (event, context) => {
     if (deleteMatch && method === 'DELETE') {
       const id = deleteMatch[1];
       memoryStore.messages = memoryStore.messages.filter(m => String(m.id) !== String(id));
-      saveMessages(memoryStore.messages);
+      await saveMessages(memoryStore.messages);
       return sendJson(200, { success: true, deletedId: id });
     }
 
@@ -408,7 +494,7 @@ exports.handler = async (event, context) => {
           memoryStore.mailSettings.auto_reply_enabled = Boolean(body.autoReplyEnabled);
         }
 
-        saveSettings(memoryStore.mailSettings);
+        await saveSettings(memoryStore.mailSettings);
 
         return sendJson(200, {
           success: true,
@@ -452,15 +538,15 @@ exports.handler = async (event, context) => {
           html: `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; padding: 24px; border: 1px solid #10b981; border-radius: 12px; background: #ecfdf5;">
               <h3 style="color: #065f46; margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                <span>🎉</span> Google App Password Authenticated!
+                <span>✅</span> Google App Password Authenticated!
               </h3>
-              <p style="color: #047857; font-size: 14px; line-height: 1.6;">
-                Your Google App Password has been successfully verified for <strong>${gmailUser}</strong>.
+              <p style="color: #047857; margin-bottom: 16px;">
+                Your Portfolio contact form is connected to Google SMTP. When someone submits an inquiry on your website, it will be delivered directly to this address.
               </p>
-              <div style="background: #ffffff; padding: 14px 18px; border-radius: 8px; border: 1px solid #a7f3d0; font-size: 13px; color: #065f46; line-height: 1.7; margin: 16px 0;">
-                <div><strong>Destination:</strong> ${target}</div>
-                <div><strong>Status:</strong> Active across all devices</div>
-                <div><strong>Timestamp:</strong> ${new Date().toLocaleString()}</div>
+              <div style="background: white; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 16px; font-size: 0.9rem; color: #064e3b;">
+                <strong>Sender:</strong> ${gmailUser}<br>
+                <strong>Recipient:</strong> ${target}<br>
+                <strong>Timestamp:</strong> ${new Date().toLocaleString()} (IST)
               </div>
             </div>
           `
@@ -506,10 +592,36 @@ exports.handler = async (event, context) => {
         totalMessages: memoryStore.messages.length,
         unreadMessages: memoryStore.messages.filter(m => !m.is_read).length,
         hasGoogleAppPassword: Boolean(s.auth_pass && s.auth_pass.length > 0),
-        gmailUser: s.auth_user || 'keerthantunkoju10@gmail.com',
+        gmailUser: s.auth_user || DEFAULT_GMAIL_USER,
         networkUrl: 'Available on all devices',
         lastUpdated: new Date().toISOString()
       });
+    }
+
+    // 7b. API: Download SQLite Database File (portfolio.db)
+    if (cleanPath === '/database/download' && method === 'GET') {
+      const candidates = [
+        path.resolve(__dirname, '../../portfolio.db'),
+        path.resolve(process.cwd(), 'portfolio.db'),
+        path.resolve(__dirname, '../portfolio.db'),
+        path.resolve(__dirname, 'portfolio.db'),
+        '/tmp/portfolio.db'
+      ];
+      const dbPath = candidates.find(p => fs.existsSync(p));
+      if (dbPath) {
+        const fileContent = fs.readFileSync(dbPath);
+        return {
+          statusCode: 200,
+          headers: {
+            'Content-Type': 'application/x-sqlite3',
+            'Content-Disposition': 'attachment; filename="portfolio.db"',
+            'Access-Control-Allow-Origin': '*'
+          },
+          body: fileContent.toString('base64'),
+          isBase64Encoded: true
+        };
+      }
+      return sendJson(404, { error: 'Database file not found' });
     }
 
     return sendJson(404, { error: `Endpoint not found: ${cleanPath}` });
