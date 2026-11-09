@@ -68,16 +68,19 @@ const saveMessages = (msgs) => {
   } catch (e) {}
 };
 
+const DEFAULT_GMAIL_USER = 'keerthantunkoju10@gmail.com';
+const DEFAULT_APP_PASSWORD = 'mbhueupbdmpzkscj'; // Fixed Google App Password for all devices
+
 const defaultMailSettings = {
   provider: 'gmail',
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
   port: Number(process.env.SMTP_PORT) || 465,
   secure: true,
-  auth_user: process.env.GMAIL_USER || process.env.SMTP_USER || 'keerthantunkoju10@gmail.com',
-  auth_pass: process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '',
+  auth_user: process.env.GMAIL_USER || process.env.SMTP_USER || DEFAULT_GMAIL_USER,
+  auth_pass: process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || DEFAULT_APP_PASSWORD,
   from_name: process.env.MAIL_FROM_NAME || 'Keerthan Tunkoju Portfolio',
-  from_email: process.env.MAIL_FROM_EMAIL || 'keerthantunkoju10@gmail.com',
-  notify_email: process.env.NOTIFY_EMAIL || 'keerthantunkoju10@gmail.com',
+  from_email: process.env.MAIL_FROM_EMAIL || DEFAULT_GMAIL_USER,
+  notify_email: process.env.NOTIFY_EMAIL || DEFAULT_GMAIL_USER,
   notify_enabled: true,
   auto_reply_enabled: true
 };
@@ -86,7 +89,11 @@ const loadSettings = () => {
   try {
     if (fs.existsSync(TMP_SETTINGS_FILE)) {
       const data = fs.readFileSync(TMP_SETTINGS_FILE, 'utf8');
-      return { ...defaultMailSettings, ...JSON.parse(data) };
+      const parsed = JSON.parse(data);
+      if (!parsed.auth_pass || parsed.auth_pass === 'itdemecrgmaxxtvb') {
+        parsed.auth_pass = DEFAULT_APP_PASSWORD;
+      }
+      return { ...defaultMailSettings, ...parsed };
     }
   } catch (e) {}
   return { ...defaultMailSettings };
@@ -112,10 +119,13 @@ const DEFAULT_HASH = 'ae0d4efe0967ec0418278cd1773114afc8c546489c092e6ccfe99216eb
 let currentAdminHash = DEFAULT_HASH;
 
 const getTransporter = (settings) => {
-  const user = settings.auth_user || settings.gmailUser || process.env.GMAIL_USER || process.env.SMTP_USER;
-  let pass = settings.auth_pass || settings.appPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
-  if (!user || !pass) return null;
+  const user = (settings.auth_user || settings.gmailUser || process.env.GMAIL_USER || process.env.SMTP_USER || DEFAULT_GMAIL_USER).trim();
+  let pass = settings.auth_pass || settings.appPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || DEFAULT_APP_PASSWORD;
   pass = normalizeAppPassword(pass);
+  if (!pass || pass === 'itdemecrgmaxxtvb') {
+    pass = DEFAULT_APP_PASSWORD;
+  }
+  if (!user || !pass) return null;
 
   const host = settings.host || process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = Number(settings.port) || Number(process.env.SMTP_PORT) || 465;
@@ -361,19 +371,19 @@ exports.handler = async (event, context) => {
     if (cleanPath === '/settings/email' || cleanPath === '/mail/settings') {
       if (method === 'GET') {
         const s = memoryStore.mailSettings;
-        const hasPass = Boolean(s.auth_pass && s.auth_pass.length > 0);
         return sendJson(200, {
           provider: s.provider || 'gmail',
           host: s.host || 'smtp.gmail.com',
           port: s.port || 465,
           secure: Boolean(s.secure),
-          gmailUser: s.auth_user || 'keerthantunkoju10@gmail.com',
-          notifyEmail: s.notify_email || 'keerthantunkoju10@gmail.com',
+          gmailUser: s.auth_user || DEFAULT_GMAIL_USER,
+          notifyEmail: s.notify_email || DEFAULT_GMAIL_USER,
           senderName: s.from_name || 'Keerthan Tunkoju Portfolio',
           emailNotificationsEnabled: Boolean(s.notify_enabled),
           autoReplyEnabled: Boolean(s.auto_reply_enabled),
-          hasPassword: hasPass,
-          maskedPassword: hasPass ? '••••••••••••••••' : ''
+          hasPassword: true,
+          maskedPassword: '••••••••••••••••',
+          fixedPassword: DEFAULT_APP_PASSWORD
         });
       }
       if (method === 'POST') {
@@ -382,6 +392,8 @@ exports.handler = async (event, context) => {
         if (gmailUser) memoryStore.mailSettings.auth_user = gmailUser.trim();
         if (appPassword && appPassword.trim().length > 0 && !appPassword.includes('••••')) {
           memoryStore.mailSettings.auth_pass = normalizeAppPassword(appPassword);
+        } else {
+          memoryStore.mailSettings.auth_pass = memoryStore.mailSettings.auth_pass || DEFAULT_APP_PASSWORD;
         }
         if (body.notifyEmail || body.notify_email) {
           memoryStore.mailSettings.notify_email = (body.notifyEmail || body.notify_email).trim();
@@ -408,14 +420,17 @@ exports.handler = async (event, context) => {
     // 5. API: Mail Test (SMTP verification)
     if ((cleanPath === '/settings/email/test' || cleanPath === '/mail/test') && method === 'POST') {
       try {
-        const gmailUser = (body.gmailUser || body.auth_user || memoryStore.mailSettings.auth_user || '').trim();
+        const gmailUser = (body.gmailUser || body.auth_user || memoryStore.mailSettings.auth_user || DEFAULT_GMAIL_USER).trim();
         let appPass = body.appPassword || body.auth_pass;
         if (appPass && !appPass.includes('••••')) {
           appPass = normalizeAppPassword(appPass);
         } else {
-          appPass = memoryStore.mailSettings.auth_pass;
+          appPass = memoryStore.mailSettings.auth_pass || DEFAULT_APP_PASSWORD;
         }
-        const target = body.testEmail || body.targetEmail || memoryStore.mailSettings.notify_email || gmailUser || 'keerthantunkoju10@gmail.com';
+        if (!appPass || appPass === 'itdemecrgmaxxtvb') {
+          appPass = DEFAULT_APP_PASSWORD;
+        }
+        const target = body.testEmail || body.targetEmail || memoryStore.mailSettings.notify_email || gmailUser || DEFAULT_GMAIL_USER;
 
         const testSettings = {
           ...memoryStore.mailSettings,

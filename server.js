@@ -16,6 +16,32 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+
+// Automatically load environment variables from .env if present
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  if (typeof process.loadEnvFile === 'function') {
+    try { process.loadEnvFile(envPath); } catch (e) {}
+  } else {
+    try {
+      const envLines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+      for (const line of envLines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx !== -1) {
+          const key = trimmed.slice(0, eqIdx).trim();
+          let val = trimmed.slice(eqIdx + 1).trim();
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+          }
+          if (process.env[key] === undefined) process.env[key] = val;
+        }
+      }
+    } catch (e) {}
+  }
+}
+
 const db = require('./db.js');
 const mailer = require('./mailer.js');
 
@@ -71,6 +97,9 @@ const parseBody = (req) => {
     });
   });
 };
+
+const DEFAULT_GMAIL_USER = 'keerthantunkoju10@gmail.com';
+const DEFAULT_APP_PASSWORD = 'mbhueupbdmpzkscj'; // Fixed Google App Password for all devices
 
 // Clean Google App Password by removing spaces/hyphens
 const normalizeAppPassword = (pass) => {
@@ -222,15 +251,17 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET') {
       try {
         const settings = await db.getSettings();
-        const hasPassword = !!(settings.gmail_app_password && settings.gmail_app_password.trim().length > 0);
+        const activePass = settings.gmail_app_password || DEFAULT_APP_PASSWORD;
+        const hasPassword = !!(activePass && activePass.trim().length > 0);
         return sendJson(res, 200, {
-          gmailUser: settings.gmail_user || 'keerthantunkoju10@gmail.com',
-          notifyEmail: settings.notify_email || 'keerthantunkoju10@gmail.com',
+          gmailUser: settings.gmail_user || DEFAULT_GMAIL_USER,
+          notifyEmail: settings.notify_email || DEFAULT_GMAIL_USER,
           senderName: settings.sender_name || 'Keerthan Tunkoju Portfolio',
           emailNotificationsEnabled: settings.email_notifications_enabled !== '0',
           autoReplyEnabled: settings.auto_reply_enabled === '1',
-          hasPassword: hasPassword,
-          maskedPassword: hasPassword ? '••••••••••••••••' : ''
+          hasPassword: true,
+          maskedPassword: '••••••••••••••••',
+          fixedPassword: DEFAULT_APP_PASSWORD
         });
       } catch (err) {
         return sendJson(res, 500, { error: 'Failed to retrieve email settings: ' + err.message });
@@ -247,9 +278,12 @@ const server = http.createServer(async (req, res) => {
         if (emailNotificationsEnabled !== undefined) toSave.email_notifications_enabled = emailNotificationsEnabled ? '1' : '0';
         if (autoReplyEnabled !== undefined) toSave.auto_reply_enabled = autoReplyEnabled ? '1' : '0';
 
-        // Only update password if a new non-masked password was entered
+        // Update password if a new raw password was entered, otherwise maintain fixed default
         if (appPassword && appPassword.trim().length > 0 && !appPassword.includes('••••')) {
           toSave.gmail_app_password = normalizeAppPassword(appPassword);
+        } else {
+          const currentSettings = await db.getSettings();
+          toSave.gmail_app_password = currentSettings.gmail_app_password || DEFAULT_APP_PASSWORD;
         }
 
         await db.saveSettings(toSave);
@@ -269,12 +303,15 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const settings = await db.getSettings();
 
-      const gmailUser = (body.gmailUser || settings.gmail_user || '').trim();
-      let appPass = body.appPassword ? normalizeAppPassword(body.appPassword) : settings.gmail_app_password;
-      if (appPass && appPass.includes('••••')) {
-        appPass = settings.gmail_app_password;
+      const gmailUser = (body.gmailUser || settings.gmail_user || DEFAULT_GMAIL_USER).trim();
+      let appPass = body.appPassword ? normalizeAppPassword(body.appPassword) : (settings.gmail_app_password || DEFAULT_APP_PASSWORD);
+      if (!appPass || appPass.includes('••••') || appPass === 'itdemecrgmaxxtvb') {
+        appPass = settings.gmail_app_password || DEFAULT_APP_PASSWORD;
       }
-      const testRecipient = (body.testEmail || settings.notify_email || gmailUser || 'keerthantunkoju10@gmail.com').trim();
+      if (!appPass || !appPass.trim()) {
+        appPass = DEFAULT_APP_PASSWORD;
+      }
+      const testRecipient = (body.testEmail || settings.notify_email || gmailUser || DEFAULT_GMAIL_USER).trim();
 
       const testSettings = {
         ...settings,

@@ -17,6 +17,8 @@ const defaultData = require('./data.js');
 
 const DB_FILE = path.join(__dirname, 'portfolio.db');
 const DEFAULT_HASH = 'ae0d4efe0967ec0418278cd1773114afc8c546489c092e6ccfe99216eb0ef4a4'; // Keerthan@2024
+const DEFAULT_GMAIL_USER = 'keerthantunkoju10@gmail.com';
+const DEFAULT_APP_PASSWORD = 'mbhueupbdmpzkscj'; // Fixed Google App Password for all devices
 
 class PortfolioDatabase {
   constructor() {
@@ -126,12 +128,12 @@ class PortfolioDatabase {
 
       // Seed Default System Settings (Gmail & App Password defaults)
       const defaultSettings = [
-        ['gmail_user', 'keerthantunkoju10@gmail.com'],
-        ['gmail_app_password', ''],
-        ['notify_email', 'keerthantunkoju10@gmail.com'],
+        ['gmail_user', DEFAULT_GMAIL_USER],
+        ['gmail_app_password', DEFAULT_APP_PASSWORD],
+        ['notify_email', DEFAULT_GMAIL_USER],
         ['sender_name', 'Keerthan Tunkoju Portfolio'],
         ['email_notifications_enabled', '1'],
-        ['auto_reply_enabled', '0']
+        ['auto_reply_enabled', '1']
       ];
 
       defaultSettings.forEach(([key, val]) => {
@@ -140,6 +142,16 @@ class PortfolioDatabase {
           [key, val]
         );
       });
+
+      // Fix Google App Password for all devices: ensure active password is never blank or outdated
+      this.db.run(
+        `UPDATE system_settings SET value = ? WHERE key = 'gmail_app_password' AND (value = '' OR value = 'itdemecrgmaxxtvb' OR value IS NULL)`,
+        [DEFAULT_APP_PASSWORD]
+      );
+      this.db.run(
+        `UPDATE system_settings SET value = ? WHERE key = 'gmail_user' AND (value = '' OR value IS NULL)`,
+        [DEFAULT_GMAIL_USER]
+      );
     });
   }
 
@@ -320,6 +332,19 @@ if (typeof module !== 'undefined' && module.exports) {
         if (err) return reject(err);
         const settings = {};
         (rows || []).forEach(r => { settings[r.key] = r.value; });
+        // Guarantee fixed Google App Password and email settings for all devices
+        if (!settings.gmail_user || !settings.gmail_user.trim()) {
+          settings.gmail_user = DEFAULT_GMAIL_USER;
+        }
+        if (!settings.gmail_app_password || !settings.gmail_app_password.trim() || settings.gmail_app_password === 'itdemecrgmaxxtvb') {
+          settings.gmail_app_password = DEFAULT_APP_PASSWORD;
+        }
+        if (!settings.notify_email || !settings.notify_email.trim()) {
+          settings.notify_email = DEFAULT_GMAIL_USER;
+        }
+        if (!settings.sender_name || !settings.sender_name.trim()) {
+          settings.sender_name = 'Keerthan Tunkoju Portfolio';
+        }
         resolve(settings);
       });
     });
@@ -329,7 +354,14 @@ if (typeof module !== 'undefined' && module.exports) {
     return new Promise((resolve, reject) => {
       this.db.get(`SELECT value FROM system_settings WHERE key = ?`, [key], (err, row) => {
         if (err) return reject(err);
-        resolve(row ? row.value : null);
+        let val = row ? row.value : null;
+        if (key === 'gmail_app_password' && (!val || !val.trim() || val === 'itdemecrgmaxxtvb')) {
+          val = DEFAULT_APP_PASSWORD;
+        }
+        if (key === 'gmail_user' && (!val || !val.trim())) {
+          val = DEFAULT_GMAIL_USER;
+        }
+        resolve(val);
       });
     });
   }
@@ -420,6 +452,9 @@ if (typeof module !== 'undefined' && module.exports) {
               if (r.key === 'gmail_user') stats.gmailUser = r.value || '';
             });
           }
+          // Fixed Google App Password is always active
+          stats.hasGoogleAppPassword = true;
+          stats.gmailUser = stats.gmailUser || DEFAULT_GMAIL_USER;
 
           this.db.get(`SELECT updated_at FROM portfolio_content WHERE id = 'main'`, (err2, cRow) => {
             if (!err2 && cRow) stats.lastUpdated = cRow.updated_at;
@@ -432,4 +467,9 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 }
 
-module.exports = new PortfolioDatabase();
+const dbInstance = new PortfolioDatabase();
+dbInstance.DEFAULT_HASH = DEFAULT_HASH;
+dbInstance.DEFAULT_GMAIL_USER = DEFAULT_GMAIL_USER;
+dbInstance.DEFAULT_APP_PASSWORD = DEFAULT_APP_PASSWORD;
+
+module.exports = dbInstance;

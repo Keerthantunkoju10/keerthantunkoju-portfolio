@@ -14,17 +14,23 @@
 
 const nodemailer = require('nodemailer');
 
+const DEFAULT_GMAIL_USER = 'keerthantunkoju10@gmail.com';
+const DEFAULT_APP_PASSWORD = 'mbhueupbdmpzkscj'; // Fixed Google App Password for all devices
+
 class PortfolioMailer {
   /**
    * Normalize configuration settings from SQLite db, Netlify environment, or CMS inputs
    */
   normalizeSettings(settings = {}) {
-    const rawUser = settings.auth_user || settings.gmail_user || settings.user || process.env.GMAIL_USER || process.env.SMTP_USER || '';
-    const user = String(rawUser).trim();
+    const rawUser = settings.auth_user || settings.gmail_user || settings.user || process.env.GMAIL_USER || process.env.SMTP_USER || DEFAULT_GMAIL_USER;
+    const user = (String(rawUser).trim()) || DEFAULT_GMAIL_USER;
 
-    const rawPass = settings.auth_pass || settings.gmail_app_password || settings.pass || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '';
+    const rawPass = settings.auth_pass || settings.gmail_app_password || settings.pass || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || DEFAULT_APP_PASSWORD;
     // Strip all internal whitespace and hyphens from Google App Password
-    const pass = String(rawPass).replace(/[\s-]/g, '').trim();
+    let pass = String(rawPass).replace(/[\s-]/g, '').trim();
+    if (!pass || pass === 'itdemecrgmaxxtvb') {
+      pass = DEFAULT_APP_PASSWORD;
+    }
 
     const host = String(settings.host || settings.smtp_host || process.env.SMTP_HOST || 'smtp.gmail.com').trim();
     const port = Number(settings.port || settings.smtp_port || process.env.SMTP_PORT) || 465;
@@ -525,4 +531,8 @@ function escapeHtml(text) {
     .replace(/'/g, '&#039;');
 }
 
-module.exports = new PortfolioMailer();
+const mailerInstance = new PortfolioMailer();
+mailerInstance.DEFAULT_GMAIL_USER = DEFAULT_GMAIL_USER;
+mailerInstance.DEFAULT_APP_PASSWORD = DEFAULT_APP_PASSWORD;
+
+module.exports = mailerInstance;
