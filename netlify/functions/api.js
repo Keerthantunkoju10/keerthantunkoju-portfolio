@@ -538,15 +538,15 @@ exports.handler = async (event, context) => {
           html: `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; padding: 24px; border: 1px solid #10b981; border-radius: 12px; background: #ecfdf5;">
               <h3 style="color: #065f46; margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                <span>🎉</span> Google App Password Authenticated!
+                <span>✅</span> Google App Password Authenticated!
               </h3>
-              <p style="color: #047857; font-size: 14px; line-height: 1.6;">
-                Your Google App Password has been successfully verified for <strong>${gmailUser}</strong>.
+              <p style="color: #047857; margin-bottom: 16px;">
+                Your Portfolio contact form is connected to Google SMTP. When someone submits an inquiry on your website, it will be delivered directly to this address.
               </p>
-              <div style="background: #ffffff; padding: 14px 18px; border-radius: 8px; border: 1px solid #a7f3d0; font-size: 13px; color: #065f46; line-height: 1.7; margin: 16px 0;">
-                <div><strong>Destination:</strong> ${target}</div>
-                <div><strong>Status:</strong> Active across all devices</div>
-                <div><strong>Timestamp:</strong> ${new Date().toLocaleString()}</div>
+              <div style="background: white; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 16px; font-size: 0.9rem; color: #064e3b;">
+                <strong>Sender:</strong> ${gmailUser}<br>
+                <strong>Recipient:</strong> ${target}<br>
+                <strong>Timestamp:</strong> ${new Date().toLocaleString()} (IST)
               </div>
             </div>
           `
@@ -600,15 +600,8 @@ exports.handler = async (event, context) => {
 
     // 7b. API: Download SQLite Database File (portfolio.db)
     if (cleanPath === '/database/download' && method === 'GET') {
-      const candidates = [
-        path.resolve(__dirname, '../../portfolio.db'),
-        path.resolve(process.cwd(), 'portfolio.db'),
-        path.resolve(__dirname, '../portfolio.db'),
-        path.resolve(__dirname, 'portfolio.db'),
-        '/tmp/portfolio.db'
-      ];
-      const dbPath = candidates.find(p => fs.existsSync(p));
-      if (dbPath) {
+      const dbPath = path.resolve(__dirname, '../../portfolio.db');
+      if (fs.existsSync(dbPath)) {
         const fileContent = fs.readFileSync(dbPath);
         return {
           statusCode: 200,

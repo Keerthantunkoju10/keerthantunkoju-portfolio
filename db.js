@@ -460,6 +460,7 @@ if (typeof module !== 'undefined' && module.exports) {
             if (!err2 && cRow) stats.lastUpdated = cRow.updated_at;
             resolve(stats);
           });
+
         });
       });
     });

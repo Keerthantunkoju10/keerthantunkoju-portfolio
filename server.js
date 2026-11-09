@@ -591,5 +591,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`   🌐 Network URL:  http://${netIp}:${PORT}  <-- Open this on phone/other devices!`);
   console.log(`🗄️  Database:     SQLite (portfolio.db) active and initialized`);
   console.log(`📧 Mail Service: Configured for keerthantunkoju10@gmail.com`);
+  console.log(`📄 Resume:       http://localhost:${PORT}/KeerthanTunkoju.pdf`);
+  console.log(`🔑 Admin Login:  Password "Keerthan@2024"`);
   console.log(`==================================================================\n`);
 });
